@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { HistoryTurn } from "../../src/ai/conversation.js";
 import { toGeminiHistory, generateReply } from "../../src/ai/conversation.js";
-import { RateLimitError } from "../../src/ai/errors.js";
+import { RateLimitError, AiUnavailableError } from "../../src/ai/errors.js";
 
 describe("toGeminiHistory", () => {
   it("maps roles and preserves order", () => {
@@ -75,5 +75,26 @@ describe("generateReply", () => {
     await expect(
       generateReply(genai, { history: [], userTurn: "x", model: "m" }),
     ).rejects.toBeInstanceOf(RateLimitError);
+  });
+
+  it("rethrows other errors without retry", async () => {
+    const boom = new Error("boom");
+    const { genai, create } = fakeGenAI(() => {
+      throw boom;
+    });
+    await expect(
+      generateReply(genai, { history: [], userTurn: "x", model: "m" }),
+    ).rejects.toBe(boom);
+    expect(create.mock.calls).toHaveLength(1);
+  });
+
+  it("retries once on unavailable (503) then throws AiUnavailableError", async () => {
+    const { genai, create } = fakeGenAI(() => {
+      throw { status: 503 };
+    });
+    await expect(
+      generateReply(genai, { history: [], userTurn: "x", model: "m" }),
+    ).rejects.toBeInstanceOf(AiUnavailableError);
+    expect(create.mock.calls).toHaveLength(2);
   });
 });

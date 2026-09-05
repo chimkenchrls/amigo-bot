@@ -33,13 +33,20 @@ export function onMessageCreate(
     const botId = deps.getBotUserId();
     if (!botId) return;
 
-    const replyToBot = await isReplyToBot(message, botId, deps.botMessages);
+    // Cheap short-circuits before any cache lookup or REST fetch: bot-authored
+    // and system messages can never trigger a reply, and a message that already
+    // @mentions the bot doesn't need the reply-chain check at all.
+    if (message.author.bot || message.system) return;
+    const mentionsBot = message.mentions.users.has(botId);
+    const replyToBot = mentionsBot
+      ? false
+      : await isReplyToBot(message, botId, deps.botMessages);
     const outcome = evaluateTrigger(
       {
         authorBot: message.author.bot,
         system: message.system,
         content: message.content,
-        mentionsBot: message.mentions.users.has(botId),
+        mentionsBot,
       },
       botId,
       replyToBot,

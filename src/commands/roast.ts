@@ -1,35 +1,15 @@
-import {
-  SlashCommandBuilder,
-  MessageFlags,
-  type ChatInputCommandInteraction,
-} from "discord.js";
-import type { GoogleGenAI } from "@google/genai";
+import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { ROAST_COOLDOWN_MS, DISCORD_MSG_LIMIT } from "../constants.js";
-import type { Cooldown } from "../lib/cooldown.js";
-import type { Logger } from "../lib/log.js";
 import {
   validateImage,
   fetchImageAsBase64,
   type AttachmentLike,
 } from "../lib/image.js";
-import { pickRoastMode, roastImage } from "../ai/roast.js";
+import { pickRoastMode, roastImage, type RoastMode } from "../ai/roast.js";
 import { AiUnavailableError, RateLimitError } from "../ai/errors.js";
+import type { Command, CommandCtx } from "./types.js";
 
-export interface CommandCtx {
-  cooldown: Cooldown;
-  genai: GoogleGenAI;
-  logger: Logger;
-  model: string;
-  rng?: () => number;
-}
-
-export interface Command {
-  data: { name: string; toJSON(): unknown };
-  execute(
-    interaction: ChatInputCommandInteraction,
-    ctx: CommandCtx,
-  ): Promise<void>;
-}
+export type { Command, CommandCtx } from "./types.js";
 
 export interface RoastInput {
   userId: string;
@@ -39,24 +19,32 @@ export interface RoastInput {
 export interface RoastReply {
   kind: "bad-image" | "blocked" | "rate" | "down" | "ok";
   content: string;
+  mode?: RoastMode;
+}
+
+export function badImageContent(attachment: AttachmentLike | null): string | null {
+  if (!attachment) return "you gotta actually upload a photo";
+  const check = validateImage(attachment);
+  if (check.ok) return null;
+  return check.reason === "too-large"
+    ? "that image is too chonky (4MB max)"
+    : "that's not a photo i can work with";
 }
 
 export async function runRoast(
   input: RoastInput,
   ctx: CommandCtx,
 ): Promise<RoastReply> {
-  if (!input.attachment) {
-    return { kind: "bad-image", content: "you gotta actually upload a photo" };
+  const badImage = badImageContent(input.attachment);
+  if (badImage !== null || !input.attachment) {
+    return {
+      kind: "bad-image",
+      content: badImage ?? "you gotta actually upload a photo",
+    };
   }
   const check = validateImage(input.attachment);
   if (!check.ok) {
-    return {
-      kind: "bad-image",
-      content:
-        check.reason === "too-large"
-          ? "that image is too chonky (4MB max)"
-          : "that's not a photo i can work with",
-    };
+    return { kind: "bad-image", content: "that's not a photo i can work with" };
   }
 
   let encoded;
@@ -70,7 +58,6 @@ export async function runRoast(
   }
 
   const mode = pickRoastMode(ctx.rng);
-  ctx.logger.info("roast", { mode });
 
   try {
     const res = await roastImage(ctx.genai, {
@@ -83,20 +70,31 @@ export async function runRoast(
       return {
         kind: "blocked",
         content: "my roast circuits tripped a breaker on that one",
+        mode,
       };
     }
-    return { kind: "ok", content: res.text };
+    return { kind: "ok", content: res.text, mode };
   } catch (err) {
     if (err instanceof RateLimitError) {
-      return { kind: "rate", content: "hitting my limits — gimme a minute" };
+      return {
+        kind: "rate",
+        content: "hitting my limits — gimme a minute",
+        mode,
+      };
     }
     if (err instanceof AiUnavailableError) {
-      return { kind: "down", content: "my brain's offline, try again later" };
+      return {
+        kind: "down",
+        content: "my brain's offline, try again later",
+        mode,
+      };
     }
     ctx.logger.error("roast failed", {
       name: err instanceof Error ? err.name : "unknown",
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
     });
-    return { kind: "down", content: "something broke, try again" };
+    return { kind: "down", content: "something broke, try again", mode };
   }
 }
 
@@ -108,6 +106,28 @@ export const roastCommand: Command = {
       o.setName("image").setDescription("the photo").setRequired(true),
     ),
   async execute(interaction, ctx) {
+    const started = Date.now();
+    const attachment = interaction.options.getAttachment("image");
+    const attachmentLike: AttachmentLike | null = attachment
+      ? {
+          contentType: attachment.contentType,
+          size: attachment.size,
+          url: attachment.url,
+        }
+      : null;
+
+    // Validate the attachment BEFORE consuming the cooldown or deferring, so a
+    // rejected upload (e.g. a PDF) doesn't cost the user 30s for a call that
+    // never reaches Gemini.
+    const badImage = badImageContent(attachmentLike);
+    if (badImage !== null) {
+      await interaction.reply({
+        content: badImage,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     const cd = ctx.cooldown.check(interaction.user.id, "roast", ROAST_COOLDOWN_MS);
     if (!cd.ok) {
       await interaction.reply({
@@ -117,20 +137,17 @@ export const roastCommand: Command = {
       return;
     }
     await interaction.deferReply();
-    const attachment = interaction.options.getAttachment("image");
     const reply = await runRoast(
-      {
-        userId: interaction.user.id,
-        attachment: attachment
-          ? {
-              contentType: attachment.contentType,
-              size: attachment.size,
-              url: attachment.url,
-            }
-          : null,
-      },
+      { userId: interaction.user.id, attachment: attachmentLike },
       ctx,
     );
     await interaction.editReply(reply.content.slice(0, DISCORD_MSG_LIMIT));
+    ctx.logger.info("roast invoked", {
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      mode: reply.mode,
+      kind: reply.kind,
+      ms: Date.now() - started,
+    });
   },
 };

@@ -52,7 +52,7 @@ describe("runRoast", () => {
   it("returns the roast text on success", async () => {
     (roastImage as any).mockResolvedValue({ ok: true, text: "gremlin energy" });
     const r = await runRoast({ userId: "u", attachment: png }, ctx());
-    expect(r).toEqual({ kind: "ok", content: "gremlin energy" });
+    expect(r).toMatchObject({ kind: "ok", content: "gremlin energy" });
   });
 
   it("maps a blocked result", async () => {
@@ -88,7 +88,8 @@ describe("roastCommand.execute", () => {
   it("sends an ephemeral nudge on cooldown before deferring", async () => {
     const interaction = {
       user: { id: "u" },
-      options: { getAttachment: () => null },
+      guildId: "g",
+      options: { getAttachment: () => png },
       reply: vi.fn(),
       deferReply: vi.fn(),
       editReply: vi.fn(),
@@ -106,5 +107,34 @@ describe("roastCommand.execute", () => {
       }),
     );
     expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid attachment before consuming the cooldown or deferring", async () => {
+    const interaction = {
+      user: { id: "u" },
+      guildId: "g",
+      options: {
+        getAttachment: () => ({
+          contentType: "application/pdf",
+          size: 100,
+          url: "https://x/y.pdf",
+        }),
+      },
+      reply: vi.fn(),
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+    const c = ctx();
+
+    await roastCommand.execute(interaction as any, c as any);
+
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flags: MessageFlags.Ephemeral,
+        content: expect.stringContaining("not a photo"),
+      }),
+    );
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(c.cooldown.check).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { MessageFlags, type Interaction } from "discord.js";
-import type { Command, CommandCtx } from "../commands/roast.js";
+import type { Command, CommandCtx } from "../commands/types.js";
 import type { Logger } from "../lib/log.js";
 
 export interface RouteDeps {
@@ -34,6 +34,8 @@ export function routeInteraction(
       deps.logger.error("command failed", {
         name: interaction.commandName,
         error: err instanceof Error ? err.name : "unknown",
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       });
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply(ERR_LINE).catch(() => {});

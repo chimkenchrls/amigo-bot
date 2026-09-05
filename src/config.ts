@@ -32,7 +32,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     discordToken: required.DISCORD_TOKEN!,
     discordAppId: required.DISCORD_APP_ID!,
     geminiApiKey: required.GEMINI_API_KEY!,
-    model: env.GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+    model: env.GEMINI_MODEL?.trim() || "gemini-3.6-flash",
     databasePath: env.DATABASE_PATH?.trim() || "./data/amigo.db",
     logLevel,
   };

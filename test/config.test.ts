@@ -13,7 +13,7 @@ describe("loadConfig", () => {
     expect(c.discordToken).toBe("t");
     expect(c.discordAppId).toBe("a");
     expect(c.geminiApiKey).toBe("k");
-    expect(c.model).toBe("gemini-2.5-flash");
+    expect(c.model).toBe("gemini-3.6-flash");
     expect(c.databasePath).toBe("./data/amigo.db");
     expect(c.logLevel).toBe("info");
   });

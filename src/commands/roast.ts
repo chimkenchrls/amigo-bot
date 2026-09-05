@@ -1,5 +1,6 @@
 import {
   SlashCommandBuilder,
+  MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { GoogleGenAI } from "@google/genai";
@@ -36,7 +37,7 @@ export interface RoastInput {
 }
 
 export interface RoastReply {
-  kind: "cooldown" | "bad-image" | "blocked" | "rate" | "down" | "ok";
+  kind: "bad-image" | "blocked" | "rate" | "down" | "ok";
   content: string;
 }
 
@@ -44,11 +45,6 @@ export async function runRoast(
   input: RoastInput,
   ctx: CommandCtx,
 ): Promise<RoastReply> {
-  const cd = ctx.cooldown.check(input.userId, "roast", ROAST_COOLDOWN_MS);
-  if (!cd.ok) {
-    return { kind: "cooldown", content: `chill — ${cd.retryAfter}s left` };
-  }
-
   if (!input.attachment) {
     return { kind: "bad-image", content: "you gotta actually upload a photo" };
   }
@@ -112,6 +108,14 @@ export const roastCommand: Command = {
       o.setName("image").setDescription("the photo").setRequired(true),
     ),
   async execute(interaction, ctx) {
+    const cd = ctx.cooldown.check(interaction.user.id, "roast", ROAST_COOLDOWN_MS);
+    if (!cd.ok) {
+      await interaction.reply({
+        content: `chill — ${cd.retryAfter}s left`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
     await interaction.deferReply();
     const attachment = interaction.options.getAttachment("image");
     const reply = await runRoast(

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { runRoast } from "../../src/commands/roast.js";
+import { MessageFlags } from "discord.js";
+import { runRoast, roastCommand } from "../../src/commands/roast.js";
 import { AiUnavailableError, RateLimitError } from "../../src/ai/errors.js";
 
 vi.mock("../../src/ai/roast.js", async (orig) => {
@@ -33,15 +34,6 @@ describe("runRoast", () => {
       data: "B64",
       mimeType: "image/png",
     }));
-  });
-
-  it("blocks on cooldown", async () => {
-    const c = ctx();
-    c.cooldown.check = vi.fn(() => ({ ok: false, retryAfter: 12 }));
-    const r = await runRoast({ userId: "u", attachment: png }, c);
-    expect(r.kind).toBe("cooldown");
-    expect(r.content).toContain("12");
-    expect(roastImage).not.toHaveBeenCalled();
   });
 
   it("rejects a non-image", async () => {
@@ -87,5 +79,32 @@ describe("runRoast", () => {
     const r = await runRoast({ userId: "u", attachment: png }, ctx());
     expect(r.kind).toBe("down");
     expect(roastImage).not.toHaveBeenCalled();
+  });
+});
+
+describe("roastCommand.execute", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sends an ephemeral nudge on cooldown before deferring", async () => {
+    const interaction = {
+      user: { id: "u" },
+      options: { getAttachment: () => null },
+      reply: vi.fn(),
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+    const c = ctx();
+    c.cooldown.check = vi.fn(() => ({ ok: false, retryAfter: 12 }));
+
+    await roastCommand.execute(interaction as any, c as any);
+
+    expect(interaction.reply).toHaveBeenCalledTimes(1);
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flags: MessageFlags.Ephemeral,
+        content: expect.stringContaining("12"),
+      }),
+    );
+    expect(interaction.deferReply).not.toHaveBeenCalled();
   });
 });

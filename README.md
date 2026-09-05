@@ -10,7 +10,7 @@ per-channel memory.
 2. `cp .env.example .env` and fill in:
    - `DISCORD_TOKEN`, `DISCORD_APP_ID` — from the [Discord Developer Portal](https://discord.com/developers/applications)
    - `GEMINI_API_KEY` — from [Google AI Studio](https://aistudio.google.com/apikey)
-   - Optional: `GEMINI_MODEL` (default `gemini-2.5-flash`), `DATABASE_PATH`
+   - Optional: `GEMINI_MODEL` (default `gemini-3.6-flash`), `DATABASE_PATH`
      (default `./data/amigo.db`), `LOG_LEVEL` (`debug` | `info` | `warn` | `error`,
      default `info`)
 3. In the Developer Portal, enable the **Message Content Intent** for the app.

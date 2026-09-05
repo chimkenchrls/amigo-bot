@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="AmIgo logo">
+  <rect width="512" height="512" rx="120" fill="#2B1B3D"/>
+
+  <!-- chaotic energy sparkles (kept inside the circle-crop safe zone) -->
+  <path d="M386 84 Q390 112 416 118 Q390 124 386 152 Q382 124 356 118 Q382 112 386 84 Z" fill="#FF7A3D"/>
+  <path d="M126 388 Q129 408 148 412 Q129 416 126 436 Q123 416 104 412 Q123 408 126 388 Z" fill="#FFC24B"/>
+
+  <g transform="rotate(-5 256 252)">
+    <!-- speech-bubble tail -->
+    <path d="M158 336 L150 436 L242 352 Z" fill="#FFF4E6"/>
+    <!-- speech-bubble body -->
+    <rect x="100" y="120" width="312" height="230" rx="64" fill="#FFF4E6"/>
+
+    <!-- face: mismatched eyes + a smirk -->
+    <circle cx="208" cy="236" r="25" fill="#2B1B3D"/>
+    <circle cx="312" cy="218" r="18" fill="#2B1B3D"/>
+    <path d="M190 292 Q252 344 324 262" fill="none" stroke="#2B1B3D" stroke-width="21" stroke-linecap="round"/>
+  </g>
+</svg>

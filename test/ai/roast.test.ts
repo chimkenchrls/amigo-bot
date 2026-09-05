@@ -20,6 +20,7 @@ const params = {
 describe("pickRoastMode", () => {
   it("splits on 0.5", () => {
     expect(pickRoastMode(() => 0.1)).toBe("ROAST");
+    expect(pickRoastMode(() => 0.5)).toBe("TOAST");
     expect(pickRoastMode(() => 0.9)).toBe("TOAST");
   });
 });
@@ -63,6 +64,7 @@ describe("roastImage", () => {
       throw { status: 429, name: "ApiError" };
     });
     await expect(roastImage(genai, params)).rejects.toBeInstanceOf(RateLimitError);
+    expect((genai as never as { models: { generateContent: any } }).models.generateContent).toHaveBeenCalledTimes(1);
   });
 
   it("retries once then throws AiUnavailableError on 5xx", async () => {
@@ -75,5 +77,15 @@ describe("roastImage", () => {
       AiUnavailableError,
     );
     expect(calls).toBe(2);
+  });
+
+  it("throws original error on unknown status (no retry)", async () => {
+    const originalError = new Error("bad request");
+    (originalError as never as { status: number }).status = 400;
+    const genai = fakeGenAI(() => {
+      throw originalError;
+    });
+    await expect(roastImage(genai, params)).rejects.toBe(originalError);
+    expect((genai as never as { models: { generateContent: any } }).models.generateContent).toHaveBeenCalledTimes(1);
   });
 });

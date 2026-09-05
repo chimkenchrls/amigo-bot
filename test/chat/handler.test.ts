@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { handleChat } from "../../src/chat/handler.js";
+import { MAX_CHAT_INPUT_CHARS } from "../../src/constants.js";
 import { RateLimitError, AiUnavailableError } from "../../src/ai/errors.js";
 
 vi.mock("../../src/ai/conversation.js", async (orig) => {
@@ -56,7 +57,7 @@ describe("handleChat", () => {
     const d = deps();
     const c = ctx();
     await handleChat(d)(c);
-    expect(d.store.recent).toHaveBeenCalledWith("c", 15);
+    expect(d.store.recent).toHaveBeenCalledWith("c", 16);
     expect(c.reply).toHaveBeenCalledWith("sup");
     expect(d.store.append).toHaveBeenNthCalledWith(1, "c", "user", "Dana: hello");
     expect(d.store.append).toHaveBeenNthCalledWith(2, "c", "model", "sup");
@@ -99,5 +100,34 @@ describe("handleChat", () => {
     await expect(handleChat(d)(c)).resolves.toBeUndefined();
     expect(c.reply).toHaveBeenCalledTimes(1);
     expect(d.store.append).not.toHaveBeenCalled();
+  });
+
+  it("logs a caught Error with its stack in the meta", async () => {
+    (generateReply as any).mockRejectedValue(new Error("boom"));
+    const d = deps();
+    const c = ctx();
+    await handleChat(d)(c);
+    expect(d.logger.error).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        message: "boom",
+        stack: expect.any(String),
+      }),
+    );
+  });
+
+  it("clamps oversized inbound text before the AI call and before persisting", async () => {
+    (generateReply as any).mockResolvedValue({ ok: true, text: "sup" });
+    const d = deps();
+    const c = ctx({ text: "x".repeat(5000) });
+    await handleChat(d)(c);
+    const prefixLen = "Dana: ".length;
+    const cap = MAX_CHAT_INPUT_CHARS + prefixLen;
+    const sentTurn = (generateReply as any).mock.calls[0][1].userTurn as string;
+    expect(sentTurn.length).toBeLessThanOrEqual(cap);
+    const appended = (d.store.append as any).mock.calls.find(
+      (call: unknown[]) => call[1] === "user",
+    )!;
+    expect((appended[2] as string).length).toBeLessThanOrEqual(cap);
   });
 });

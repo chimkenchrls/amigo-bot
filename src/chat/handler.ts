@@ -3,6 +3,7 @@ import {
   CHAT_COOLDOWN_MS,
   CHAT_HISTORY_KEEP,
   CHAT_HISTORY_LOAD,
+  MAX_CHAT_INPUT_CHARS,
 } from "../constants.js";
 import type { Cooldown } from "../lib/cooldown.js";
 import type { MessageStore } from "../store/messages.js";
@@ -52,7 +53,8 @@ export function handleChat(deps: ChatDeps) {
 
       const rows = deps.store.recent(ctx.channelId, CHAT_HISTORY_LOAD);
       const history = toGeminiHistory(rows);
-      const userTurn = `${ctx.displayName}: ${ctx.text}`;
+      const clampedText = ctx.text.slice(0, MAX_CHAT_INPUT_CHARS);
+      const userTurn = `${ctx.displayName}: ${clampedText}`;
 
       let result;
       try {
@@ -71,6 +73,8 @@ export function handleChat(deps: ChatDeps) {
         logger.error("chat generate failed", {
           guildId: ctx.guildId,
           name: err instanceof Error ? err.name : "unknown",
+          message: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
         });
         await sendChunks(ctx, deps, line);
         return;
@@ -88,6 +92,8 @@ export function handleChat(deps: ChatDeps) {
     } catch (err) {
       logger.error("chat handler crashed", {
         name: err instanceof Error ? err.name : "unknown",
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       });
       await ctx.reply(ERR_CRASH).catch(() => {});
     }

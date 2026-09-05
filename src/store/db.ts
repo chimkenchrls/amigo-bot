@@ -39,16 +39,18 @@ export function openDatabase(dbPath: string): DB {
     current = row?.version ?? 0;
   }
 
-  const run = db.transaction(() => {
-    for (let i = current; i < MIGRATIONS.length; i++) {
-      MIGRATIONS[i]!(db);
-    }
-    db.prepare("DELETE FROM schema_version").run();
-    db.prepare("INSERT INTO schema_version (version) VALUES (?)").run(
-      MIGRATIONS.length,
-    );
-  });
-  run();
+  if (current < MIGRATIONS.length) {
+    const run = db.transaction(() => {
+      for (let i = current; i < MIGRATIONS.length; i++) {
+        MIGRATIONS[i]!(db);
+      }
+      db.prepare("DELETE FROM schema_version").run();
+      db.prepare("INSERT INTO schema_version (version) VALUES (?)").run(
+        MIGRATIONS.length,
+      );
+    });
+    run();
+  }
 
   return db;
 }

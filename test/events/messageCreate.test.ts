@@ -74,6 +74,36 @@ describe("onMessageCreate", () => {
     expect(inner).not.toHaveBeenCalled();
   });
 
+  it("skips the reply-chain fetch for a bot-authored message with a reference", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const fetch = vi.fn(async () => ({ author: { id: "BOT" } }));
+    const m = msg({
+      author: { bot: true, id: "u1" },
+      mentions: { users: new Map() },
+      reference: { messageId: "ref1" },
+      channel: { sendTyping: vi.fn(async () => {}), messages: { fetch } },
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(inner).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("skips the reply-chain fetch when the message already @mentions the bot", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const fetch = vi.fn(async () => ({ author: { id: "someone" } }));
+    const m = msg({
+      content: "<@BOT> and a reply",
+      mentions: { users: new Map([["BOT", {}]]) },
+      reference: { messageId: "ref1" },
+      channel: { sendTyping: vi.fn(async () => {}), messages: { fetch } },
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(inner).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("responds to a reply whose referenced id is in the bot-message cache", async () => {
     const inner = vi.fn(async (_ctx: ChatContext) => {});
     (handleChat as any).mockReturnValue(inner);

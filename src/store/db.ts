@@ -19,8 +19,8 @@ export const MIGRATIONS: ReadonlyArray<(db: DB) => void> = [
   },
 ];
 
-export function openDatabase(path: string): DB {
-  const db = new Database(path);
+export function openDatabase(dbPath: string): DB {
+  const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 

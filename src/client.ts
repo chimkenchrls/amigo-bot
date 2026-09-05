@@ -9,5 +9,6 @@ export function createClient(): Client {
       GatewayIntentBits.GuildMessageReactions,
     ],
     partials: [Partials.Message, Partials.Channel],
+    allowedMentions: { parse: [], repliedUser: true },
   });
 }

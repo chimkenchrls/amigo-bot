@@ -46,30 +46,57 @@ client.on(
   }),
 );
 
-client.on("error", (e) => logger.error("client error", { name: e.name }));
-client.on("shardError", (e) => logger.error("shard error", { name: e.name }));
+client.on("error", (e) =>
+  logger.error("client error", {
+    name: e.name,
+    message: e.message,
+    stack: e.stack,
+  }),
+);
+client.on("shardError", (e) =>
+  logger.error("shard error", {
+    name: e.name,
+    message: e.message,
+    stack: e.stack,
+  }),
+);
+
+// Give the buffered log write a moment to flush before a fatal exit.
+const fatalExit = (): void => {
+  process.exitCode = 1;
+  setTimeout(() => process.exit(1), 100);
+};
 
 process.on("unhandledRejection", (reason) =>
   logger.error("unhandledRejection", {
     name: reason instanceof Error ? reason.name : "unknown",
+    message: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
   }),
 );
 process.on("uncaughtException", (err) => {
-  logger.error("uncaughtException", { name: err.name, message: err.message });
-  process.exit(1);
+  logger.error("uncaughtException", {
+    name: err instanceof Error ? err.name : "unknown",
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
+  fatalExit();
 });
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     logger.info("shutting down", { sig });
-    void client.destroy();
-    db.close();
-    process.exit(0);
+    void client.destroy().finally(() => {
+      db.close();
+      process.exit(0);
+    });
   });
 }
 
 client.login(config.discordToken).catch((err) => {
   logger.error("login failed", {
-    message: err instanceof Error ? err.message : "?",
+    name: err instanceof Error ? err.name : "unknown",
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
   });
-  process.exit(1);
+  fatalExit();
 });

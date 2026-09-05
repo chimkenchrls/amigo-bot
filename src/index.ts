@@ -10,8 +10,9 @@ import { createMessageStore } from "./store/messages.js";
 import { createGenAI } from "./ai/client.js";
 import { createClient } from "./client.js";
 import { commands } from "./commands/index.js";
-import { registerReady } from "./events/ready.js";
+import { registerReady, botUserId } from "./events/ready.js";
 import { routeInteraction } from "./events/interactionCreate.js";
+import { onMessageCreate } from "./events/messageCreate.js";
 
 const logger = createLogger(config.logLevel);
 
@@ -24,10 +25,6 @@ const cooldown = createCooldown();
 const botMessages = createBotMessageCache();
 const genai = createGenAI(config.geminiApiKey);
 
-// store + botMessages are wired here for the chat feature (later tasks).
-void store;
-void botMessages;
-
 const client = createClient();
 registerReady(client, logger);
 
@@ -35,6 +32,18 @@ const commandCtx = { cooldown, genai, logger, model: config.model };
 client.on(
   "interactionCreate",
   routeInteraction({ commands, ctx: commandCtx, logger }),
+);
+client.on(
+  "messageCreate",
+  onMessageCreate({
+    cooldown,
+    store,
+    genai,
+    botMessages,
+    logger,
+    model: config.model,
+    getBotUserId: () => botUserId.current,
+  }),
 );
 
 client.on("error", (e) => logger.error("client error", { name: e.name }));

@@ -27,6 +27,6 @@ describe("createLogger", () => {
     const lines: string[] = [];
     const log = createLogger("info", (l) => lines.push(l));
     log.info("x\ny");
-    expect(lines[0].endsWith("\n")).toBe(false);
+    expect(lines[0]!.endsWith("\n")).toBe(false);
   });
 });

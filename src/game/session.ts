@@ -4,6 +4,7 @@ import {
   renderDay,
   renderLobby,
   renderNight,
+  renderReveal,
   renderRoleEphemeral,
   renderVote,
 } from "./render.js";
@@ -12,7 +13,14 @@ import type { Logger } from "../lib/log.js";
 import type { GameState, NightAction, NightResult, Phase, RoleName } from "./types.js";
 import type { Lobby } from "./lobby.js";
 import { addPlayer, canStart, emptyLobby, removePlayer } from "./lobby.js";
-import { deal, pickRoleSet, playerView, resolveNight, tallyVotes } from "./engine.js";
+import {
+  deal,
+  decideWinner,
+  pickRoleSet,
+  playerView,
+  resolveNight,
+  tallyVotes,
+} from "./engine.js";
 import { ROLES } from "./roles.js";
 import { DAY_MS, LOBBY_TIMEOUT_MS, NIGHT_MS, VOTE_MS } from "./constants.js";
 
@@ -77,6 +85,7 @@ export class GameSession implements GameSessionHandle {
   private nightMsg: SentMessage | undefined;
   private dayMsg: SentMessage | undefined;
   private voteMsg: SentMessage | undefined;
+  private revealMsg: SentMessage | undefined;
   private deaths: string[] = [];
   private activeTimer: TimerHandle | undefined;
 
@@ -222,8 +231,27 @@ export class GameSession implements GameSessionHandle {
   }
 
   private async enterReveal(): Promise<void> {
-    // TASK-12 STUB — Task 13 adds decideWinner + renderReveal + onEnd.
     this.phase = "reveal";
+    if (this.activeTimer !== undefined) {
+      this.deps.clearTimer(this.activeTimer);
+      this.activeTimer = undefined;
+    }
+    const outcome = decideWinner(
+      this.state!.currentRoles,
+      this.deaths,
+      this.state!.players,
+    );
+    try {
+      this.revealMsg = await this.deps.channel.send(
+        renderReveal(null, this.state!, outcome, this.names),
+      );
+    } catch {
+      /* best effort */
+    }
+    if (this.phase === "reveal") {
+      this.phase = "done";
+      this.deps.onEnd(this.channelId);
+    }
   }
 
   async abort(reason: string): Promise<void> {
@@ -275,15 +303,15 @@ export class GameSession implements GameSessionHandle {
     if (!state.players.includes(playerId)) {
       throw new Error("wala ka sa laro");
     }
+    if (action.playerId !== playerId) {
+      throw new Error("hindi tugma ang aksyon sa manlalaro");
+    }
     if (state.nightActions.some((a) => a.playerId === playerId)) {
       throw new Error("umaksyon ka na kagabi");
     }
     const role = state.startingRoles[playerId]!;
     if (!ACTION_KINDS[role].includes(action.kind)) {
       throw new Error("mali ang aksyon para sa role mo");
-    }
-    if (action.playerId !== playerId) {
-      throw new Error("hindi tugma ang aksyon sa manlalaro");
     }
     state.nightActions.push(action);
     if (this.allActingPlayersActed()) await this.endNight();

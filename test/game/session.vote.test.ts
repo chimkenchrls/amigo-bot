@@ -38,7 +38,8 @@ describe("session day + vote", () => {
     expect(s.phase).toBe("vote");
     timers.find((t) => t.ms === VOTE_MS)!.fn();
     await Promise.resolve();
-    expect(s.phase).toBe("reveal");
+    await Promise.resolve();
+    expect(s.phase).toBe("done");
   });
 
   it("vote by a non-player throws; vote for a non-player target throws", async () => {
@@ -50,8 +51,8 @@ describe("session day + vote", () => {
     await expect(s.vote("a", "zzz")).rejects.toThrow();
   });
 
-  it("a re-vote overwrites the previous vote; all-voted ends the phase", async () => {
-    const { s, timers, deps } = await startedGame();
+  it("a re-vote overwrites the previous vote; all-voted runs reveal to game end", async () => {
+    const { s, timers, deps, sent } = await startedGame();
     timers.find((t) => t.ms === NIGHT_MS)!.fn();
     await Promise.resolve();
     await s.skip("h"); // -> vote
@@ -59,7 +60,9 @@ describe("session day + vote", () => {
     await s.vote("h", "b"); // overwrite
     await s.vote("a", "b");
     await s.vote("b", "a");
-    expect(s.phase).toBe("reveal");
-    expect(deps.onEnd).not.toHaveBeenCalled();
+    expect(s.phase).toBe("done");
+    expect(deps.onEnd).toHaveBeenCalledTimes(1);
+    expect(deps.onEnd).toHaveBeenCalledWith("c1");
+    expect(JSON.stringify(sent.at(-1)!.p)).toMatch(/Ann|Bee/);
   });
 });

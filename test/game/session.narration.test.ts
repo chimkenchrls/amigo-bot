@@ -20,7 +20,7 @@ describe("session narration", () => {
     await s.join("b", "Bee");
     await s.start("h");
 
-    const nightMsg = sent.find((x) => JSON.stringify(x.p).includes("Gabi"))!;
+    const nightMsg = sent.find((x) => JSON.stringify(x.p).includes("Night falls"))!;
     await vi.waitFor(() => expect(nightMsg.m.edit).toHaveBeenCalled());
     expect(JSON.stringify(nightMsg.m.edit.mock.calls[0])).toContain(
       "Kumalat ang lamig sa nayon.",
@@ -91,7 +91,7 @@ describe("session narration", () => {
     await s.join("b", "Bee");
     await s.start("h");
 
-    const nightMsg = sent.find((x) => JSON.stringify(x.p).includes("Gabi"))!;
+    const nightMsg = sent.find((x) => JSON.stringify(x.p).includes("Night falls"))!;
     timers.find((t) => t.ms === NARRATION_TIMEOUT_MS)!.fn();
     await Promise.resolve();
     await Promise.resolve();
@@ -120,7 +120,7 @@ describe("session narration", () => {
     await s.join("b", "Bee");
     await s.start("h");
 
-    const nightMsg = sent.find((x) => JSON.stringify(x.p).includes("Gabi"))!;
+    const nightMsg = sent.find((x) => JSON.stringify(x.p).includes("Night falls"))!;
     timers.find((t) => t.ms === NIGHT_MS)!.fn(); // -> day before narration settles
     await vi.waitFor(() => expect(s.phase).toBe("day"));
 
@@ -148,7 +148,7 @@ describe("session narration", () => {
 
     timers.find((t) => t.ms === NIGHT_MS)!.fn(); // -> day
     const dayMsg = await vi.waitFor(() => {
-      const m = sent.find((x) => JSON.stringify(x.p).includes("minuto"));
+      const m = sent.find((x) => JSON.stringify(x.p).includes("to talk"));
       if (!m) throw new Error("no day message yet");
       return m;
     });

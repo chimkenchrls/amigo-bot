@@ -42,13 +42,13 @@ function sessionDepsFor(
 export const werewolfCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("werewolf")
-    .setDescription("Maglaro ng One Night Werewolf — ako ang game master.")
+    .setDescription("Play One Night Werewolf — I'm the game master.")
     .setDMPermission(false),
   async execute(interaction, ctx) {
     const channel = interaction.channel;
     if (!channel || !("send" in channel)) {
       await interaction.reply({
-        content: "hindi dito pwede maglaro",
+        content: "can't run a game in here",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -56,7 +56,7 @@ export const werewolfCommand: Command = {
 
     if (ctx.registry.has(interaction.channelId)) {
       await interaction.reply({
-        content: "may laro na dito — tapusin niyo muna 'yun",
+        content: "there's already a game here — finish that one first",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -69,7 +69,7 @@ export const werewolfCommand: Command = {
     );
     if (!cd.ok) {
       await interaction.reply({
-        content: `chill lang — ${cd.retryAfter}s pa`,
+        content: `hold on — ${cd.retryAfter}s left`,
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -82,13 +82,13 @@ export const werewolfCommand: Command = {
     );
     const session = await createGameSession(interaction.user.id, deps);
     if (ctx.registry.has(interaction.channelId)) {
-      await session.abort("nauna ang ibang laro dito");
+      await session.abort("another game beat you to this channel");
       return;
     }
     ctx.registry.set(session);
     await interaction.reply({
       content:
-        "Ginawa ko na ang lobby sa taas ⬆️ — pindutin ang **Sali**.",
+        "Lobby's up ⬆️ — hit **Join**.",
       flags: MessageFlags.Ephemeral,
     });
   },

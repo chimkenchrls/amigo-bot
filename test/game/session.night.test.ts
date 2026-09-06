@@ -16,7 +16,7 @@ describe("session night", () => {
     const { s, timers } = await startedGame({ rng: () => 0.01 });
     await expect(
       s.act("a", { kind: "noop", playerId: "b" }),
-    ).rejects.toThrow(/tugma/);
+    ).rejects.toThrow(/match your role/);
     // nothing was recorded for "b": "b" is still free to submit their own action
     await expect(
       s.act("b", { kind: "robber", playerId: "b", target: "a" }),
@@ -61,12 +61,12 @@ describe("session night", () => {
     expect(s.phase).toBe("day");
     const content = s.showRole("h").content ?? "";
     expect(content).toContain("Bee"); // b's display name
-    expect(content).not.toMatch(/lobo:\s*b\b/); // not the bare id "b"
+    expect(content).not.toMatch(/Aswang:\s*b\b/); // not the bare id "b"
   });
 
   it("showRole rejects a non-player", async () => {
     const { s } = await startedGame();
-    expect(s.showRole("zzz")).toEqual({ content: "Hindi ka kasali sa laro." });
+    expect(s.showRole("zzz")).toEqual({ content: "You're not in this game." });
   });
 
   it("act() rejects an off-roster robber/seer target", async () => {
@@ -92,7 +92,7 @@ describe("session night", () => {
     const { s } = await startedGame({ rng: () => 0.01 });
     await expect(
       s.act("a", { kind: "seer-center", playerId: "a", centers: [0, 5] }),
-    ).rejects.toThrow(/gitna/);
+    ).rejects.toThrow(/valid center card/);
   });
 
   it("act() rejects a seer player peek at an off-roster target", async () => {

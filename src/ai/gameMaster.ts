@@ -11,8 +11,8 @@ import {
 
 export const GAME_PERSONA = [
   "You are AmIgo, hosting a one-night hidden-role party game for this Discord server.",
-  "Narrate in casual Taglish (mostly Tagalog, some English) — dramatic emcee energy,",
-  "2-4 sentences, funny but tense. You are the game master, not a player.",
+  "Narrate in English — dramatic emcee energy, 2-4 sentences, funny but tense.",
+  "You are the game master, not a player.",
   "Narrate ONLY the facts you are given. Never reveal, guess, or invent any player's",
   "hidden role, never accuse anyone, never mention hidden information. No slurs, never punch down.",
 ].join(" ");
@@ -94,7 +94,13 @@ export function createGameMaster(genai: GoogleGenAI, model: string): GameMaster 
           f.deadNames.length
             ? `Voted out: ${f.deadNames.join(", ")}.`
             : "Nobody was voted out."
-        } Winner: ${f.winningTeam} team. Give a dramatic wrap-up.`,
+        } Winner: ${
+          f.winningTeam === "werewolf"
+            ? "the Aswang (werewolf team)"
+            : f.winningTeam === "tanner"
+              ? "the Martir"
+              : "the village"
+        }. Give a dramatic wrap-up.`,
       ),
   };
 }

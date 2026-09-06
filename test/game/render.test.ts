@@ -37,10 +37,10 @@ describe("render", () => {
   it("renderRoleEphemeral appends night lines when present", () => {
     const p = renderRoleEphemeral({
       startingRole: "seer",
-      nightLines: ["Ang card ni Dana: werewolf."],
+      nightLines: ["Dana's card: Aswang."],
       revealed: false,
     });
-    expect(p.content).toContain("werewolf");
+    expect(p.content).toContain("Aswang");
   });
 
   it("renderReveal shows every player, the dealt->final arrow, and the summary", () => {
@@ -68,14 +68,14 @@ describe("render", () => {
     const outcome: Outcome = {
       winningTeam: "village",
       deaths: ["p3"],
-      summary: "Napatay ang lobo. Panalo ang nayon!",
+      summary: "The Aswang got voted out. The village wins!",
     };
     const p = renderReveal(null, state, outcome, { p1: "Alice", p2: "Bob", p3: "Carol" });
     expect(p.content).toContain("Alice");
     expect(p.content).toContain("Bob");
     expect(p.content).toContain("Carol");
     expect(p.content).toContain(" → ");
-    expect(p.content).toContain("Napatay ang lobo. Panalo ang nayon!");
+    expect(p.content).toContain("The Aswang got voted out. The village wins!");
   });
 
   it("renderReveal renders '?' for a missing role instead of 'undefined'", () => {
@@ -101,14 +101,14 @@ describe("render", () => {
 
   it("renderActEphemeral villager gets a matulog message and no components", () => {
     const p = renderActEphemeral("villager", {}, []);
-    expect(p.content).toMatch(/matulog/i);
+    expect(p.content).toMatch(/sleep/i);
     expect(p.components === undefined || p.components.length === 0).toBe(true);
   });
 
   it("renderActEphemeral for a non-choosing acting role points at the morning, not existing info", () => {
     const p = renderActEphemeral("insomniac", {}, []);
-    expect(p.content).toMatch(/umaga/i);
-    expect(p.content).not.toMatch(/Nakuha mo na/i);
+    expect(p.content).toMatch(/morning/i);
+    expect(p.content).not.toMatch(/already/i);
     expect(p.components === undefined || p.components.length === 0).toBe(true);
   });
 

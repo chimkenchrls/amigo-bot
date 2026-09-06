@@ -56,13 +56,13 @@ export function decodeId(customId: string): GameAction | null {
 const SEER_CENTERS: [number, number] = [0, 1];
 
 const MSG = {
-  noGame: "Walang laro dito. Mag-/werewolf muna.",
-  noPick: "Wala kang napili.",
-  notHost: "Host lang ang pwedeng magkansela.",
+  noGame: "No game here. Run /werewolf first.",
+  noPick: "You didn't pick anything.",
+  notHost: "Only the host can cancel.",
   generic: "may mali",
 } as const;
 
-const CANCEL_REASON = "kinansela ng host";
+const CANCEL_REASON = "cancelled by the host";
 
 /** A Discord component interaction, decoded to just what the router needs. */
 export interface GameInteraction {

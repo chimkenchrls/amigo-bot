@@ -33,7 +33,7 @@ describe("/werewolf", () => {
     const i = interaction();
     await werewolfCommand.execute(i as never, c as never);
     expect(i.reply).toHaveBeenCalledWith(
-      expect.objectContaining({ content: expect.stringContaining("laro na dito") }),
+      expect.objectContaining({ content: expect.stringContaining("already a game here") }),
     );
     expect((c.registry.set as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
   });
@@ -54,7 +54,7 @@ describe("/werewolf", () => {
     expect(c.registry.set).not.toHaveBeenCalled();
     // the message the session posted during createGameSession gets an abort notice
     const sent = (i.channel.send as ReturnType<typeof vi.fn>).mock.calls;
-    expect(JSON.stringify(sent)).toMatch(/nauna ang ibang laro/);
+    expect(JSON.stringify(sent)).toMatch(/beat you to this channel/);
   });
 
   it("does not consume the cooldown when the channel is unusable or occupied", async () => {

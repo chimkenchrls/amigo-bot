@@ -7,6 +7,21 @@ export interface RoleDef {
   wakeIndex: number;
 }
 
+/** Player-facing name for each role — English game, Tagalog-flavoured roles. */
+export const ROLE_LABELS: Record<RoleName, string> = {
+  werewolf: "Aswang",
+  minion: "Minion",
+  mason: "Tropa",
+  seer: "Manghuhula",
+  robber: "Magnanakaw",
+  troublemaker: "Pasaway",
+  insomniac: "Puyat",
+  villager: "Tambay",
+  tanner: "Martir",
+};
+
+export const roleLabel = (role: RoleName): string => ROLE_LABELS[role];
+
 export const ROLES: Record<RoleName, RoleDef> = {
   werewolf: { name: "werewolf", team: "werewolf", acts: true, wakeIndex: 1 },
   minion: { name: "minion", team: "werewolf", acts: true, wakeIndex: 2 },

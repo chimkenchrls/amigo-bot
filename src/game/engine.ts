@@ -1,5 +1,8 @@
 import type { GameState, NightAction, NightResult, Outcome, Phase, PlayerView, RoleName, SlotId, Team } from "./types.js";
-import { selectRoleSet } from "./roles.js";
+import { ROLE_LABELS, selectRoleSet } from "./roles.js";
+
+const label = (role: RoleName | undefined): string =>
+  role ? ROLE_LABELS[role] : "?";
 
 export function pickRoleSet(playerCount: number): RoleName[] {
   return selectRoleSet(playerCount);
@@ -64,18 +67,18 @@ export function resolveNight(
               (c) => startingRoles[c] === "werewolf",
             );
             push(id, centerWolf
-              ? "Mag-isa kang lobo. May kapwa-lobo sa gitna."
-              : "Mag-isa kang lobo ngayon gabi.");
+              ? "You're a lone Aswang — there's another one in the center."
+              : "You're the only Aswang tonight.");
           } else {
-            push(id, `Kasabwat mong lobo: ${others.map(nameOf).join(", ")}.`);
+            push(id, `Your fellow Aswang: ${others.map(nameOf).join(", ")}.`);
           }
           break;
         }
         case "minion": {
           const wolves = playerIds.filter((o) => startingRoles[o] === "werewolf");
           push(id, wolves.length
-            ? `Ang mga lobo: ${wolves.map(nameOf).join(", ")}. Protektahan mo sila.`
-            : "Walang lobo sa mga manlalaro. Ikaw lang bahala.");
+            ? `The Aswang: ${wolves.map(nameOf).join(", ")}. Keep them safe.`
+            : "No Aswang among the players. You're on your own.");
           break;
         }
         case "mason": {
@@ -83,17 +86,17 @@ export function resolveNight(
             (o) => o !== id && startingRoles[o] === "mason",
           );
           push(id, others.length
-            ? `Kapwa mason: ${others.map(nameOf).join(", ")}.`
-            : "Ikaw lang ang mason. Nasa gitna ang isa pa.");
+            ? `Fellow Tropa: ${others.map(nameOf).join(", ")}.`
+            : "You're the only Tropa in play — the other is in the center.");
           break;
         }
         case "seer": {
           const a = actionFor(id);
           if (a?.kind === "seer-player") {
-            push(id, `Ang card ni ${nameOf(a.target)}: ${board[a.target]}.`);
+            push(id, `${nameOf(a.target)}'s card: ${label(board[a.target])}.`);
           } else if (a?.kind === "seer-center") {
             const [x, y] = a.centers;
-            push(id, `Gitna #${x + 1}: ${board[`center-${x}`]}. Gitna #${y + 1}: ${board[`center-${y}`]}.`);
+            push(id, `Center #${x + 1}: ${label(board[`center-${x}`])}. Center #${y + 1}: ${label(board[`center-${y}`])}.`);
           }
           break;
         }
@@ -103,7 +106,7 @@ export function resolveNight(
             const acquired = board[a.target]!;
             board[a.target] = board[id]!;
             board[id] = acquired;
-            push(id, `Ninakaw mo ang role ni ${nameOf(a.target)}. Ikaw na ang: ${acquired}.`);
+            push(id, `You robbed ${nameOf(a.target)}. You're now the ${label(acquired)}.`);
           }
           break;
         }
@@ -117,7 +120,7 @@ export function resolveNight(
           break;
         }
         case "insomniac": {
-          push(id, `Ang role mo ngayon: ${board[id]}.`);
+          push(id, `Your card now: ${label(board[id])}.`);
           break;
         }
       }
@@ -168,10 +171,10 @@ export function decideWinner(
 
   const summary =
     winningTeam === "village"
-      ? "Panalo ang nayon."
+      ? "The village wins."
       : winningTeam === "werewolf"
-        ? "Panalo ang mga lobo."
-        : "Panalo ang Tanner — nagpapatay siya ng sarili.";
+        ? "The Aswang win."
+        : "The Martir wins — sacrificed on purpose.";
   return { winningTeam, deaths, summary };
 }
 

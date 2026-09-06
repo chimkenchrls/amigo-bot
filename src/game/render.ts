@@ -7,7 +7,11 @@ import {
 } from "discord.js";
 import type { GameState, Outcome, PlayerView, RoleName } from "./types.js";
 import type { Lobby } from "./lobby.js";
+import { ROLE_LABELS } from "./roles.js";
 import { WEREWOLF_MAX_PLAYERS, WEREWOLF_MIN_PLAYERS } from "./constants.js";
+
+const roleName = (role: RoleName | undefined): string =>
+  role ? ROLE_LABELS[role] : "?";
 
 export interface MessagePayload {
   content?: string;
@@ -16,16 +20,16 @@ export interface MessagePayload {
 }
 
 const BLURBS: Record<RoleName, string> = {
-  werewolf: "Werewolf — team lobo. Gabi: makikita mo ang kasabwat mo.",
-  minion: "Minion — team lobo. Alam mo sino ang lobo; sila hindi alam ikaw.",
-  mason: "Mason — team nayon. Magkakita kayong mga mason sa gabi.",
-  seer: "Seer — team nayon. Silipin ang isang manlalaro o dalawang center card.",
-  robber: "Robber — team nayon. Palit card sa isa, tapos mo makikita bago mo.",
+  werewolf: "**Aswang** — Werewolf team. At night you see your fellow Aswang.",
+  minion: "**Minion** — Werewolf team. You see who the Aswang are; they don't see you.",
+  mason: "**Tropa** — Village team. You and the other Tropa see each other at night.",
+  seer: "**Manghuhula** — Village team. Peek one player's card, or two center cards.",
+  robber: "**Magnanakaw** — Village team. Swap your card with someone's, then see your new role.",
   troublemaker:
-    "Troublemaker — team nayon. Palitan ang card ng dalawang iba (di mo makikita).",
-  insomniac: "Insomniac — team nayon. Pagkatapos ng gabi, silip mo sariling card.",
-  villager: "Villager — team nayon. Walang gagawin sa gabi.",
-  tanner: "Tanner — solo. Panalo ka lang kung ikaw ang mabo-vote out.",
+    "**Pasaway** — Village team. Swap two other players' cards without looking.",
+  insomniac: "**Puyat** — Village team. At the end of the night, check your own card.",
+  villager: "**Tambay** — Village team. No night action.",
+  tanner: "**Martir** — Solo. You win only if you get voted out.",
 };
 
 export const roleBlurb = (role: RoleName): string => BLURBS[role];
@@ -49,14 +53,14 @@ export function renderLobby(lobby: Lobby, names: Record<string, string>): Messag
   const list = lobby.players.map((id, i) => `${i + 1}. ${names[id] ?? id}`).join("\n");
   return {
     content:
-      `**One Night Werewolf** — hino-host ni AmIgo\n` +
-      `${lobby.players.length}/${WEREWOLF_MAX_PLAYERS} sumali (min ${WEREWOLF_MIN_PLAYERS}):\n${list}`,
+      `**One Night Werewolf** — hosted by AmIgo\n` +
+      `${lobby.players.length}/${WEREWOLF_MAX_PLAYERS} joined (min ${WEREWOLF_MIN_PLAYERS}):\n${list}`,
     components: [
       buttonRow(
-        btn("wolf:join", "Sali", ButtonStyle.Success),
-        btn("wolf:leave", "Alis", ButtonStyle.Secondary),
-        btn("wolf:start", "Simulan", ButtonStyle.Primary),
-        btn("wolf:cancel", "Kanselahin", ButtonStyle.Danger),
+        btn("wolf:join", "Join", ButtonStyle.Success),
+        btn("wolf:leave", "Leave", ButtonStyle.Secondary),
+        btn("wolf:start", "Start", ButtonStyle.Primary),
+        btn("wolf:cancel", "Cancel", ButtonStyle.Danger),
       ),
     ],
   };
@@ -65,12 +69,12 @@ export function renderLobby(lobby: Lobby, names: Record<string, string>): Messag
 export function renderNight(narration: string | null): MessagePayload {
   return {
     content:
-      (narration ?? "🌙 Gabi na. Nakapikit ang lahat...") +
-      "\n\nPindutin ang **🔍 Role Mo** para makita ang role at (kung may aksyon ka) ang **🎭 Aksyon**.",
+      (narration ?? "🌙 Night falls. Everyone closes their eyes...") +
+      "\n\nHit **🔍 My Role** to see your card, and **🎭 Act** if your role does something at night.",
     components: [
       buttonRow(
-        btn("wolf:role", "🔍 Role Mo", ButtonStyle.Secondary),
-        btn("wolf:act", "🎭 Aksyon", ButtonStyle.Primary),
+        btn("wolf:role", "🔍 My Role", ButtonStyle.Secondary),
+        btn("wolf:act", "🎭 Act", ButtonStyle.Primary),
         btn("wolf:skip", "⏭️ Skip (host)", ButtonStyle.Secondary),
       ),
     ],
@@ -80,12 +84,12 @@ export function renderNight(narration: string | null): MessagePayload {
 export function renderDay(narration: string | null, minutes: number): MessagePayload {
   return {
     content:
-      (narration ?? "☀️ Umaga na.") +
-      `\n\n**${minutes} minuto** kayong mag-usap, tapos boto. Pindutin ang 🔍 kung kailangan.`,
+      (narration ?? "☀️ Morning.") +
+      `\n\nYou have **${minutes} min** to talk, then you vote. Hit 🔍 if you need it.`,
     components: [
       buttonRow(
-        btn("wolf:role", "🔍 Role Mo", ButtonStyle.Secondary),
-        btn("wolf:skip", "⏭️ Skip sa boto (host)", ButtonStyle.Secondary),
+        btn("wolf:role", "🔍 My Role", ButtonStyle.Secondary),
+        btn("wolf:skip", "⏭️ Skip to vote (host)", ButtonStyle.Secondary),
       ),
     ],
   };
@@ -97,11 +101,11 @@ export function renderVote(
 ): MessagePayload {
   const menu = new StringSelectMenuBuilder()
     .setCustomId("wolf:vote")
-    .setPlaceholder("Sino ang ivo-vote mo?")
+    .setPlaceholder("Who are you voting out?")
     .addOptions(playerOptions(names, players));
   return {
     content:
-      "🗳️ **Boto na.** Pumili ng ivo-vote out. Pwede palitan hanggang matapos ang oras.",
+      "🗳️ **Vote.** Pick who to vote out. You can change it until time's up.",
     components: [selectRow(menu)],
   };
 }
@@ -116,27 +120,27 @@ export function renderReveal(
   if (narration) {
     lines.push(narration, "");
   }
-  lines.push("**Ang mga role:**");
+  lines.push("**The roles:**");
   for (const id of state.players) {
     lines.push(
-      `- ${names[id] ?? id}: ${state.startingRoles[id] ?? "?"} → ${state.currentRoles[id] ?? "?"}`,
+      `- ${names[id] ?? id}: ${roleName(state.startingRoles[id])} → ${roleName(state.currentRoles[id])}`,
     );
   }
   lines.push(
-    `**Gitna:** ${state.startingRoles["center-0"] ?? "?"}, ${state.startingRoles["center-1"] ?? "?"}, ${state.startingRoles["center-2"] ?? "?"}`,
+    `**Center:** ${roleName(state.startingRoles["center-0"])}, ${roleName(state.startingRoles["center-1"])}, ${roleName(state.startingRoles["center-2"])}`,
   );
   const deaths = outcome.deaths.length
     ? outcome.deaths.map((id) => names[id] ?? id).join(", ")
-    : "wala";
-  lines.push(`**Namatay:** ${deaths}`);
+    : "nobody";
+  lines.push(`**Voted out:** ${deaths}`);
   lines.push(outcome.summary);
   return { content: lines.join("\n") };
 }
 
 export function renderRoleEphemeral(view: PlayerView): MessagePayload & { flags: number } {
-  const parts = [`**Role mo:** ${roleBlurb(view.startingRole)}`];
+  const parts = [`**Your role:** ${roleBlurb(view.startingRole)}`];
   if (view.nightLines.length) {
-    parts.push("", "**Nalaman mo kagabi:**", ...view.nightLines);
+    parts.push("", "**What you learned last night:**", ...view.nightLines);
   }
   return { content: parts.join("\n"), flags: MessageFlags.Ephemeral };
 }
@@ -151,14 +155,14 @@ export function renderActEphemeral(
   if (role === "seer") {
     const menu = new StringSelectMenuBuilder()
       .setCustomId("wolf:seer:player")
-      .setPlaceholder("Sino ang sisilipin mo?")
+      .setPlaceholder("Whose card do you want to see?")
       .addOptions(playerOptions(names, actablePlayers));
     return {
-      content: "Silipin ang isang manlalaro, o ang gitna.",
+      content: "Peek at one player's card, or two of the center cards.",
       components: [
         selectRow(menu),
         buttonRow(
-          btn("wolf:seer:center", "Silipin ang gitna (2 card)", ButtonStyle.Secondary),
+          btn("wolf:seer:center", "Look at the center (2 cards)", ButtonStyle.Secondary),
         ),
       ],
       flags,
@@ -168,10 +172,10 @@ export function renderActEphemeral(
   if (role === "robber") {
     const menu = new StringSelectMenuBuilder()
       .setCustomId("wolf:rob")
-      .setPlaceholder("Sino ang nanakawan mo?")
+      .setPlaceholder("Who do you want to rob?")
       .addOptions(playerOptions(names, actablePlayers));
     return {
-      content: "Sino ang nanakawan mo ng role?",
+      content: "Whose role do you want to steal?",
       components: [selectRow(menu)],
       flags,
     };
@@ -180,12 +184,12 @@ export function renderActEphemeral(
   if (role === "troublemaker") {
     const menu = new StringSelectMenuBuilder()
       .setCustomId("wolf:tm")
-      .setPlaceholder("Pumili ng dalawa.")
+      .setPlaceholder("Pick two.")
       .setMinValues(2)
       .setMaxValues(2)
       .addOptions(playerOptions(names, actablePlayers));
     return {
-      content: "Pumili ng DALAWA na papalitan ang card.",
+      content: "Pick TWO players whose cards to swap.",
       components: [selectRow(menu)],
       flags,
     };
@@ -193,7 +197,7 @@ export function renderActEphemeral(
 
   const content =
     role === "villager" || role === "tanner"
-      ? "Wala kang gagawin ngayong gabi. Matulog ka na. 😴"
-      : "Tapos ka na sa gabi. Sa **umaga** mo makikita ang mga nakita mo — pindutin ang 🔍 pagsapit ng araw.";
+      ? "Nothing to do tonight. Get some sleep. 😴"
+      : "You're done for the night. You'll see what you learned in the **morning** — hit 🔍 when day breaks.";
   return { content, flags };
 }

@@ -7,8 +7,8 @@ function fakeGenAI(impl: () => unknown) {
 }
 
 describe("GAME_PERSONA", () => {
-  it("is Taglish emcee and forbids leaking hidden info", () => {
-    expect(GAME_PERSONA).toContain("Taglish");
+  it("is an English emcee and forbids leaking hidden info", () => {
+    expect(GAME_PERSONA).toContain("English");
     expect(GAME_PERSONA.toLowerCase()).toMatch(/never reveal|huwag.*role|hidden/);
   });
 });

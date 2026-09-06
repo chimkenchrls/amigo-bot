@@ -8,7 +8,7 @@ describe("session day + vote", () => {
     await s.skip("h");
     expect(s.phase).toBe("day");
     const dayPost = sent.find(
-      (r) => typeof r.p.content === "string" && r.p.content.includes("minuto"),
+      (r) => typeof r.p.content === "string" && r.p.content.includes("to talk"),
     );
     expect(dayPost).toBeDefined();
   });
@@ -54,7 +54,7 @@ describe("session day + vote", () => {
     timers.find((t) => t.ms === NIGHT_MS)!.fn();
     await Promise.resolve();
     await s.skip("h"); // -> vote
-    await expect(s.vote("a", "a")).rejects.toThrow(/sarili/);
+    await expect(s.vote("a", "a")).rejects.toThrow(/vote for yourself/);
   });
 
   it("a re-vote overwrites the previous vote; all-voted runs reveal to game end", async () => {

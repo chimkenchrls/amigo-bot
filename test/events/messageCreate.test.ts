@@ -17,6 +17,14 @@ function baseDeps() {
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     model: "m",
     getBotUserId: () => "BOT",
+    registry: {
+      has: vi.fn(() => false),
+      get: vi.fn(() => undefined),
+      set: vi.fn(),
+      remove: vi.fn(),
+      abortAll: vi.fn(async () => {}),
+      size: vi.fn(() => 0),
+    },
   };
 }
 
@@ -135,5 +143,43 @@ describe("onMessageCreate", () => {
     expect(handle.id).toBe("m1");
     await handle.edit("hoy, edited");
     expect(sentEdit).toHaveBeenCalledWith("hoy, edited");
+  });
+
+  it("does not invoke the chat handler when a game is active in the channel", async () => {
+    const inner = vi.fn(async () => {});
+    (handleChat as any).mockReturnValue(inner);
+    const deps = {
+      ...baseDeps(),
+      registry: {
+        has: vi.fn(() => true),
+        get: vi.fn(() => undefined),
+        set: vi.fn(),
+        remove: vi.fn(),
+        abortAll: vi.fn(async () => {}),
+        size: vi.fn(() => 0),
+      },
+    };
+    const m = msg({ mentions: { users: new Map([["BOT", {}]]) } });
+    await onMessageCreate(deps as never)(m as never);
+    expect(inner).not.toHaveBeenCalled();
+  });
+
+  it("invokes the chat handler normally when no game is active", async () => {
+    const inner = vi.fn(async () => {});
+    (handleChat as any).mockReturnValue(inner);
+    const deps = {
+      ...baseDeps(),
+      registry: {
+        has: vi.fn(() => false),
+        get: vi.fn(() => undefined),
+        set: vi.fn(),
+        remove: vi.fn(),
+        abortAll: vi.fn(async () => {}),
+        size: vi.fn(() => 0),
+      },
+    };
+    const m = msg({ mentions: { users: new Map([["BOT", {}]]) } });
+    await onMessageCreate(deps as never)(m as never);
+    expect(inner).toHaveBeenCalledOnce();
   });
 });

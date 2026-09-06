@@ -45,6 +45,7 @@ client.on(
     logger,
     model: config.model,
     getBotUserId: () => botUserId.current,
+    registry,
   }),
 );
 

@@ -12,6 +12,7 @@ import type { Cooldown } from "../lib/cooldown.js";
 import type { MessageStore } from "../store/messages.js";
 import type { Logger } from "../lib/log.js";
 import type { BotMessageCache } from "../lib/botMessages.js";
+import type { StudyMode } from "../lib/studyMode.js";
 import { chunk } from "../lib/chunk.js";
 import { toGeminiHistory, generateReplyStream } from "../ai/conversation.js";
 import {
@@ -27,6 +28,7 @@ export interface ChatDeps {
   botMessages: BotMessageCache;
   logger: Logger;
   model: string;
+  studyMode: StudyMode;
 }
 
 export interface SentMessage {
@@ -93,6 +95,7 @@ export function handleChat(deps: ChatDeps) {
           history,
           userTurn,
           model: deps.model,
+          studyMode: deps.studyMode.has(ctx.channelId),
         })) {
           acc += delta;
           const preview = acc.trim().slice(0, DISCORD_MSG_LIMIT);

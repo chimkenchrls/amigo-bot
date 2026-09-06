@@ -10,6 +10,7 @@ import { createMessageStore } from "./store/messages.js";
 import { createGenAI } from "./ai/client.js";
 import { createClient } from "./client.js";
 import { createRegistry } from "./game/registry.js";
+import { createStudyMode } from "./lib/studyMode.js";
 import { commands } from "./commands/index.js";
 import { registerReady, botUserId } from "./events/ready.js";
 import { routeInteraction } from "./events/interactionCreate.js";
@@ -26,11 +27,12 @@ const cooldown = createCooldown();
 const botMessages = createBotMessageCache();
 const genai = createGenAI(config.geminiApiKey);
 const registry = createRegistry();
+const studyMode = createStudyMode();
 
 const client = createClient();
 registerReady(client, logger);
 
-const commandCtx = { cooldown, genai, logger, model: config.model, registry };
+const commandCtx = { cooldown, genai, logger, model: config.model, registry, studyMode };
 client.on(
   "interactionCreate",
   routeInteraction({ commands, ctx: commandCtx, logger, registry }),
@@ -46,6 +48,7 @@ client.on(
     model: config.model,
     getBotUserId: () => botUserId.current,
     registry,
+    studyMode,
   }),
 );
 

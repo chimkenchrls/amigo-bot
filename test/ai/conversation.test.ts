@@ -77,6 +77,21 @@ describe("generateReply", () => {
     expect(sendArgs).toEqual({ message: "Dana: hello" });
   });
 
+  it("uses the study-buddy persona when studyMode is set", async () => {
+    const { genai, create } = fakeGenAI(() => ({ text: "sure" }));
+    await generateReply(genai, {
+      history: [],
+      userTurn: "Dana: explain recursion",
+      model: "m",
+      studyMode: true,
+    });
+    const sys = (
+      (create.mock.calls[0] as unknown[])[0] as { config: { systemInstruction: string } }
+    ).config.systemInstruction;
+    expect(sys).toMatch(/study-buddy mode|tutor/i);
+    expect(sys).toMatch(/quiz/i);
+  });
+
   it("returns blocked on empty text", async () => {
     const { genai } = fakeGenAI(() => ({ text: "" }));
     expect(

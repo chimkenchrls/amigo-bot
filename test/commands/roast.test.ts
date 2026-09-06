@@ -34,6 +34,7 @@ const ctx = () => ({
     abortAll: async () => {},
     size: () => 0,
   },
+  studyMode: { has: () => false, toggle: () => true, off: () => {} },
   rng: () => 0.1, // ROAST
 });
 

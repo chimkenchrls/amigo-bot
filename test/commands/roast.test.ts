@@ -36,7 +36,7 @@ const ctx = () => ({
   },
   studyMode: { has: () => false, toggle: () => true, off: () => {} },
   store: { append: () => {}, recent: () => [], trim: () => {}, purgeChannel: () => {} },
-  facts: { forChat: () => ({ channel: [], guild: [] }), add: () => null, list: () => [], remove: () => false, count: () => 0 },
+  facts: { forChat: () => ({ channel: [], guild: [] }), add: () => null, list: () => [], remove: () => false, count: () => 0, replaceAuto: () => {} },
   rng: () => 0.1, // ROAST
 });
 

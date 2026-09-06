@@ -49,6 +49,14 @@ describe("session day + vote", () => {
     await expect(s.vote("a", "zzz")).rejects.toThrow();
   });
 
+  it("rejects a self-vote", async () => {
+    const { s, timers } = await startedGame();
+    timers.find((t) => t.ms === NIGHT_MS)!.fn();
+    await Promise.resolve();
+    await s.skip("h"); // -> vote
+    await expect(s.vote("a", "a")).rejects.toThrow(/sarili/);
+  });
+
   it("a re-vote overwrites the previous vote; all-voted runs reveal to game end", async () => {
     const { s, timers, deps, sent } = await startedGame();
     timers.find((t) => t.ms === NIGHT_MS)!.fn();

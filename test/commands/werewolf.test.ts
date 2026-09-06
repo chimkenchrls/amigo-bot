@@ -46,6 +46,27 @@ describe("/werewolf", () => {
     expect(i.reply).toHaveBeenCalled();
   });
 
+  it("aborts the freshly built session if another game claimed the channel during setup", async () => {
+    const has = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const c = ctx({ registry: { has, set: vi.fn(), get: vi.fn(), remove: vi.fn() } });
+    const i = interaction();
+    await werewolfCommand.execute(i as never, c as never);
+    expect(c.registry.set).not.toHaveBeenCalled();
+    // the message the session posted during createGameSession gets an abort notice
+    const sent = (i.channel.send as ReturnType<typeof vi.fn>).mock.calls;
+    expect(JSON.stringify(sent)).toMatch(/nauna ang ibang laro/);
+  });
+
+  it("does not consume the cooldown when the channel is unusable or occupied", async () => {
+    const c1 = ctx();
+    await werewolfCommand.execute(interaction({ channel: null }) as never, c1 as never);
+    expect(c1.cooldown.check).not.toHaveBeenCalled();
+
+    const c2 = ctx({ registry: { has: vi.fn(() => true), set: vi.fn(), get: vi.fn(), remove: vi.fn() } });
+    await werewolfCommand.execute(interaction() as never, c2 as never);
+    expect(c2.cooldown.check).not.toHaveBeenCalled();
+  });
+
   it("respects the per-user cooldown", async () => {
     const c = ctx({ cooldown: { check: vi.fn(() => ({ ok: false, retryAfter: 30 })) } });
     const i = interaction();

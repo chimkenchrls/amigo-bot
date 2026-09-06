@@ -106,6 +106,12 @@ export async function routeGameInteraction(
     return;
   }
 
+  // `role` and `act` answer with their own ephemeral reply; every other verb
+  // mutates the game and can trigger a slow phase transition (e.g. a Gemini
+  // call in `enterReveal`), so ack Discord up front before dispatching.
+  const deferred = action.verb !== "role" && action.verb !== "act";
+  if (deferred) await i.deferUpdate().catch(() => {});
+
   try {
     await dispatch(action, i, session);
   } catch (err) {
@@ -114,7 +120,7 @@ export async function routeGameInteraction(
       name: err instanceof Error ? err.name : "unknown",
     });
     await i
-      .reply(ephemeral(err instanceof Error ? err.message : MSG.generic))
+      .followUp(ephemeral(err instanceof Error ? err.message : MSG.generic))
       .catch(() => {});
   }
 }
@@ -127,27 +133,22 @@ async function dispatch(
   switch (action.verb) {
     case "join":
       await session.join(i.userId, i.displayName);
-      await i.deferUpdate();
       return;
     case "leave":
       await session.leave(i.userId);
-      await i.deferUpdate();
       return;
     case "start":
       await session.start(i.userId);
-      await i.deferUpdate();
       return;
     case "skip":
       await session.skip(i.userId);
-      await i.deferUpdate();
       return;
     case "cancel":
       if (i.userId !== session.hostId) {
-        await i.reply(ephemeral(MSG.notHost));
+        await i.followUp(ephemeral(MSG.notHost));
         return;
       }
       await session.abort(CANCEL_REASON);
-      await i.deferUpdate();
       return;
     case "role":
       await i.reply({ ...session.showRole(i.userId), flags: MessageFlags.Ephemeral });
@@ -155,6 +156,12 @@ async function dispatch(
     case "act": {
       const p = session.actPrompt(i.userId);
       await i.reply("flags" in p ? p : { ...p, flags: MessageFlags.Ephemeral });
+      const components = (p as { components?: unknown[] }).components;
+      if (!components?.length) {
+        await session
+          .act(i.userId, { kind: "noop", playerId: i.userId })
+          .catch(() => {});
+      }
       return;
     }
     case "seer": {
@@ -164,12 +171,11 @@ async function dispatch(
           playerId: i.userId,
           centers: SEER_CENTERS,
         });
-        await i.deferUpdate();
         return;
       }
       const t = selected(i, 1);
       if (!t) {
-        await i.reply(ephemeral(MSG.noPick));
+        await i.followUp(ephemeral(MSG.noPick));
         return;
       }
       await session.act(i.userId, {
@@ -177,13 +183,12 @@ async function dispatch(
         playerId: i.userId,
         target: t[0]!,
       });
-      await i.deferUpdate();
       return;
     }
     case "rob": {
       const t = selected(i, 1);
       if (!t) {
-        await i.reply(ephemeral(MSG.noPick));
+        await i.followUp(ephemeral(MSG.noPick));
         return;
       }
       await session.act(i.userId, {
@@ -191,13 +196,12 @@ async function dispatch(
         playerId: i.userId,
         target: t[0]!,
       });
-      await i.deferUpdate();
       return;
     }
     case "tm": {
       const t = selected(i, 2);
       if (!t) {
-        await i.reply(ephemeral(MSG.noPick));
+        await i.followUp(ephemeral(MSG.noPick));
         return;
       }
       await session.act(i.userId, {
@@ -206,17 +210,15 @@ async function dispatch(
         a: t[0]!,
         b: t[1]!,
       });
-      await i.deferUpdate();
       return;
     }
     case "vote": {
       const t = selected(i, 1);
       if (!t) {
-        await i.reply(ephemeral(MSG.noPick));
+        await i.followUp(ephemeral(MSG.noPick));
         return;
       }
       await session.vote(i.userId, t[0]!);
-      await i.deferUpdate();
       return;
     }
   }

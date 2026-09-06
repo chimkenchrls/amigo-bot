@@ -78,6 +78,20 @@ describe("render", () => {
     expect(p.content).toContain("Napatay ang lobo. Panalo ang nayon!");
   });
 
+  it("renderReveal renders '?' for a missing role instead of 'undefined'", () => {
+    const state: GameState = {
+      players: ["p1"],
+      startingRoles: { p1: "seer" },
+      currentRoles: {},
+      nightActions: [],
+      votes: {},
+    };
+    const outcome: Outcome = { winningTeam: "village", deaths: [], summary: "x" };
+    const p = renderReveal(null, state, outcome, { p1: "Alice" });
+    expect(p.content).not.toContain("undefined");
+    expect(p.content).toContain("?");
+  });
+
   it("renderActEphemeral seer gets a mode select", () => {
     const p = renderActEphemeral("seer", { p2: "B", p3: "C" }, ["p2", "p3"]);
     const json = JSON.stringify(p);
@@ -88,6 +102,13 @@ describe("render", () => {
   it("renderActEphemeral villager gets a matulog message and no components", () => {
     const p = renderActEphemeral("villager", {}, []);
     expect(p.content).toMatch(/matulog/i);
+    expect(p.components === undefined || p.components.length === 0).toBe(true);
+  });
+
+  it("renderActEphemeral for a non-choosing acting role points at the morning, not existing info", () => {
+    const p = renderActEphemeral("insomniac", {}, []);
+    expect(p.content).toMatch(/umaga/i);
+    expect(p.content).not.toMatch(/Nakuha mo na/i);
     expect(p.components === undefined || p.components.length === 0).toBe(true);
   });
 

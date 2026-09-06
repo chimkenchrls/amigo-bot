@@ -45,19 +45,6 @@ export const werewolfCommand: Command = {
     .setDescription("Maglaro ng One Night Werewolf — ako ang game master.")
     .setDMPermission(false),
   async execute(interaction, ctx) {
-    const cd = ctx.cooldown.check(
-      interaction.user.id,
-      "werewolf",
-      WEREWOLF_COOLDOWN_MS,
-    );
-    if (!cd.ok) {
-      await interaction.reply({
-        content: `chill lang — ${cd.retryAfter}s pa`,
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
     const channel = interaction.channel;
     if (!channel || !("send" in channel)) {
       await interaction.reply({
@@ -75,12 +62,29 @@ export const werewolfCommand: Command = {
       return;
     }
 
+    const cd = ctx.cooldown.check(
+      interaction.user.id,
+      "werewolf",
+      WEREWOLF_COOLDOWN_MS,
+    );
+    if (!cd.ok) {
+      await interaction.reply({
+        content: `chill lang — ${cd.retryAfter}s pa`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     const deps = sessionDepsFor(
       channel as unknown as SendableChannel,
       interaction,
       ctx,
     );
     const session = await createGameSession(interaction.user.id, deps);
+    if (ctx.registry.has(interaction.channelId)) {
+      await session.abort("nauna ang ibang laro dito");
+      return;
+    }
     ctx.registry.set(session);
     await interaction.reply({
       content:

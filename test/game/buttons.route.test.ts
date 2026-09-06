@@ -34,12 +34,34 @@ describe("routeGameInteraction", () => {
     expect(join).toHaveBeenCalledWith("u1", "Uno");
     expect(i.deferUpdate).toHaveBeenCalled();
   });
-  it("surfaces a guard error as an ephemeral message", async () => {
+  it("surfaces a guard error as an ephemeral follow-up for a deferred verb", async () => {
     const r = createRegistry();
     r.set({ channelId: "c1", abort: vi.fn(async () => {}), start: vi.fn(async () => { throw new Error("kulang pa sa tatlo"); }) } as any);
     const i = iact({ customId: encodeId({ verb: "start" }) });
     await routeGameInteraction(i as any, r, logger as any);
-    expect(i.reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("kulang") }));
+    expect(i.deferUpdate).toHaveBeenCalled();
+    expect(i.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("kulang") }));
+  });
+
+  it("submits a noop when the act prompt carries no interactive components", async () => {
+    const r = createRegistry();
+    const act = vi.fn(async () => {});
+    const actPrompt = vi.fn(() => ({ content: "matulog ka na", flags: 64 }));
+    r.set({ channelId: "c1", abort: vi.fn(async () => {}), act, actPrompt } as any);
+    const i = iact({ customId: encodeId({ verb: "act" }) });
+    await routeGameInteraction(i as any, r, logger as any);
+    expect(act).toHaveBeenCalledWith("u1", { kind: "noop", playerId: "u1" });
+    expect(i.deferUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does NOT submit a noop when the act prompt has interactive components", async () => {
+    const r = createRegistry();
+    const act = vi.fn(async () => {});
+    const actPrompt = vi.fn(() => ({ content: "pumili", flags: 64, components: [{ x: 1 }] }));
+    r.set({ channelId: "c1", abort: vi.fn(async () => {}), act, actPrompt } as any);
+    const i = iact({ customId: encodeId({ verb: "act" }) });
+    await routeGameInteraction(i as any, r, logger as any);
+    expect(act).not.toHaveBeenCalled();
   });
   it("records a seer center peek", async () => {
     const r = createRegistry();
@@ -73,7 +95,8 @@ describe("routeGameInteraction", () => {
     const i = iact({ customId: encodeId({ verb: "tm" }), values: ["p2"] });
     await routeGameInteraction(i as any, r, logger as any);
     expect(act).not.toHaveBeenCalled();
-    expect(i.reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("napili") }));
+    expect(i.deferUpdate).toHaveBeenCalled();
+    expect(i.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("napili") }));
   });
   it("blocks cancel from a non-host", async () => {
     const r = createRegistry();
@@ -82,6 +105,7 @@ describe("routeGameInteraction", () => {
     const i = iact({ customId: encodeId({ verb: "cancel" }) });
     await routeGameInteraction(i as any, r, logger as any);
     expect(abort).not.toHaveBeenCalled();
-    expect(i.reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("Host") }));
+    expect(i.deferUpdate).toHaveBeenCalled();
+    expect(i.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("Host") }));
   });
 });

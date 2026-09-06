@@ -17,6 +17,11 @@ export const factsCommand: Command = {
         .setName("forget")
         .setDescription("delete note #N from the list")
         .setMinValue(1),
+    )
+    .addBooleanOption((o) =>
+      o
+        .setName("wipe")
+        .setDescription("clear the notes I picked up on my own (keeps your saved ones)"),
     ),
   async execute(interaction, ctx) {
     const serverWide = interaction.options.getBoolean("server") ?? false;
@@ -30,6 +35,7 @@ export const factsCommand: Command = {
 
     const list = ctx.facts.list(scope, scopeId);
     const forget = interaction.options.getInteger("forget");
+    const wipe = interaction.options.getBoolean("wipe") ?? false;
 
     if (forget !== null) {
       const target = list[forget - 1];
@@ -46,6 +52,24 @@ export const factsCommand: Command = {
       return;
     }
 
+    if (wipe) {
+      const n = ctx.facts.count(scope, scopeId, "auto");
+      if (n === 0) {
+        await interaction.reply({
+          content: "wala naman akong sariling notes dito na bubura-hin",
+          flags: EPH,
+        });
+        return;
+      }
+      ctx.facts.replaceAuto(scope, scopeId, []);
+      ctx.logger.info("auto facts wiped", { scope, scopeId, n });
+      await interaction.reply({
+        content: `okay, kinalimutan ko na 'yung ${n} note na napulot ko sarili`,
+        flags: EPH,
+      });
+      return;
+    }
+
     if (list.length === 0) {
       await interaction.reply({
         content: serverWide
@@ -56,7 +80,12 @@ export const factsCommand: Command = {
       return;
     }
 
-    const body = list.map((f, i) => `${i + 1}. ${f.content}`).join("\n");
+    const body = list
+      .map(
+        (f, i) =>
+          `${i + 1}. ${f.content}${f.source === "auto" ? "  ·picked up" : ""}`,
+      )
+      .join("\n");
     await interaction.reply({
       content:
         `**${serverWide ? "Server-wide notes" : "Notes for this channel"}:**\n${body}\n\n` +

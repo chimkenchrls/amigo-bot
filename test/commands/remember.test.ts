@@ -72,5 +72,8 @@ describe("/remember", () => {
     expect(i.reply).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.stringContaining("puno") }),
     );
+    expect(i.reply).toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.stringContaining("notes mo") }),
+    );
   });
 });

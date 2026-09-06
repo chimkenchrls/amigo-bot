@@ -33,7 +33,7 @@ registerReady(client, logger);
 const commandCtx = { cooldown, genai, logger, model: config.model, registry };
 client.on(
   "interactionCreate",
-  routeInteraction({ commands, ctx: commandCtx, logger }),
+  routeInteraction({ commands, ctx: commandCtx, logger, registry }),
 );
 client.on(
   "messageCreate",

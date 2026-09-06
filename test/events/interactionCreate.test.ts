@@ -3,10 +3,13 @@ import { MessageFlags } from "discord.js";
 import { routeInteraction } from "../../src/events/interactionCreate.js";
 
 const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+const registry = { has: vi.fn(() => false), get: vi.fn(() => undefined), set: vi.fn(), remove: vi.fn(), abortAll: vi.fn(async () => {}), size: vi.fn(() => 0) };
 
 function interaction(over: Record<string, unknown> = {}) {
   return {
     isChatInputCommand: () => true,
+    isButton: () => false,
+    isStringSelectMenu: () => false,
     commandName: "roast",
     deferred: false,
     replied: false,
@@ -27,7 +30,7 @@ describe("routeInteraction", () => {
     const execute = vi.fn(async () => {});
     const ctx = { marker: true } as never;
     const i = interaction();
-    await routeInteraction({ commands: cmd(execute), ctx, logger })(i as never);
+    await routeInteraction({ commands: cmd(execute), ctx, logger, registry } as never)(i as never);
     expect(execute).toHaveBeenCalledOnce();
     expect(execute).toHaveBeenCalledWith(i, ctx);
   });
@@ -39,7 +42,8 @@ describe("routeInteraction", () => {
       commands: cmd(execute),
       ctx: {} as never,
       logger,
-    })(i as never);
+      registry,
+    } as never)(i as never);
     expect(execute).not.toHaveBeenCalled();
     expect(i.reply).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -56,7 +60,7 @@ describe("routeInteraction", () => {
     });
     const i = interaction({ deferred: true });
     await expect(
-      routeInteraction({ commands: cmd(execute), ctx: {} as never, logger })(
+      routeInteraction({ commands: cmd(execute), ctx: {} as never, logger, registry } as never)(
         i as never,
       ),
     ).resolves.toBeUndefined();
@@ -73,7 +77,8 @@ describe("routeInteraction", () => {
       commands: cmd(execute),
       ctx: {} as never,
       logger,
-    })(i as never);
+      registry,
+    } as never)(i as never);
     expect(i.reply).toHaveBeenCalledWith(
       expect.objectContaining({ flags: MessageFlags.Ephemeral }),
     );
@@ -86,9 +91,35 @@ describe("routeInteraction", () => {
       commands: cmd(execute),
       ctx: {} as never,
       logger,
-    })(i as never);
+      registry,
+    } as never)(i as never);
     expect(i.reply).not.toHaveBeenCalled();
     expect(i.editReply).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("routes a wolf:* button to the game router and not the command path", async () => {
+    const testRegistry = { has: vi.fn(() => false), get: vi.fn(() => undefined), set: vi.fn(), remove: vi.fn(), abortAll: vi.fn(async () => {}), size: vi.fn(() => 0) };
+    const i = {
+      isChatInputCommand: () => false,
+      isButton: () => true,
+      isStringSelectMenu: () => false,
+      customId: "wolf:join",
+      channelId: "c1",
+      user: { id: "u1", username: "Uno" },
+      member: { displayName: "Uno" },
+      reply: vi.fn(async () => {}),
+      deferUpdate: vi.fn(async () => {}),
+      followUp: vi.fn(async () => {}),
+    };
+    await routeInteraction({ commands: new Map(), ctx: {} as never, logger, registry: testRegistry } as never)(i as never);
+    expect(testRegistry.get).toHaveBeenCalledWith("c1");
+  });
+
+  it("ignores a non-wolf component id", async () => {
+    const testRegistry = { has: vi.fn(() => false), get: vi.fn(() => undefined), set: vi.fn(), remove: vi.fn(), abortAll: vi.fn(async () => {}), size: vi.fn(() => 0) };
+    const i = { isChatInputCommand: () => false, isButton: () => true, isStringSelectMenu: () => false, customId: "other:x", reply: vi.fn(async () => {}), deferUpdate: vi.fn(async () => {}), followUp: vi.fn(async () => {}) };
+    await routeInteraction({ commands: new Map(), ctx: {} as never, logger, registry: testRegistry } as never)(i as never);
+    expect(testRegistry.get).not.toHaveBeenCalled();
   });
 });

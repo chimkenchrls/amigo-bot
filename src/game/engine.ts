@@ -1,4 +1,4 @@
-import type { NightAction, NightResult, Outcome, RoleName, SlotId, Team } from "./types.js";
+import type { GameState, NightAction, NightResult, Outcome, Phase, PlayerView, RoleName, SlotId, Team } from "./types.js";
 import { selectRoleSet } from "./roles.js";
 
 export function pickRoleSet(playerCount: number): RoleName[] {
@@ -172,4 +172,19 @@ export function decideWinner(
         ? "Panalo ang mga lobo."
         : "Panalo ang Tanner — nagpapatay siya ng sarili.";
   return { winningTeam, deaths, summary };
+}
+
+export function playerView(
+  playerId: string,
+  state: GameState,
+  phase: Phase,
+  nightResults: NightResult[],
+): PlayerView {
+  const showResults = phase === "day" || phase === "vote" || phase === "reveal";
+  const mine = nightResults.find((r) => r.playerId === playerId);
+  return {
+    startingRole: state.startingRoles[playerId]!,
+    nightLines: showResults && mine ? mine.lines : [],
+    revealed: phase === "reveal",
+  };
 }

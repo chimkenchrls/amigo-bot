@@ -1,14 +1,20 @@
 import type { GameSessionHandle } from "./registry.js";
 import type { MessagePayload } from "./render.js";
-import { renderDay, renderLobby, renderNight, renderRoleEphemeral } from "./render.js";
+import {
+  renderDay,
+  renderLobby,
+  renderNight,
+  renderRoleEphemeral,
+  renderVote,
+} from "./render.js";
 import type { GameMaster } from "../ai/gameMaster.js";
 import type { Logger } from "../lib/log.js";
 import type { GameState, NightAction, NightResult, Phase, RoleName } from "./types.js";
 import type { Lobby } from "./lobby.js";
 import { addPlayer, canStart, emptyLobby, removePlayer } from "./lobby.js";
-import { deal, pickRoleSet, playerView, resolveNight } from "./engine.js";
+import { deal, pickRoleSet, playerView, resolveNight, tallyVotes } from "./engine.js";
 import { ROLES } from "./roles.js";
-import { DAY_MS, LOBBY_TIMEOUT_MS, NIGHT_MS } from "./constants.js";
+import { DAY_MS, LOBBY_TIMEOUT_MS, NIGHT_MS, VOTE_MS } from "./constants.js";
 
 const MS_PER_MINUTE = 60_000;
 
@@ -70,6 +76,8 @@ export class GameSession implements GameSessionHandle {
   private lobbyMsg!: SentMessage;
   private nightMsg: SentMessage | undefined;
   private dayMsg: SentMessage | undefined;
+  private voteMsg: SentMessage | undefined;
+  private deaths: string[] = [];
   private activeTimer: TimerHandle | undefined;
 
   constructor(hostId: string, deps: SessionDeps) {
@@ -186,7 +194,36 @@ export class GameSession implements GameSessionHandle {
   }
 
   private async endDay(): Promise<void> {
-    // filled in Task 12
+    if (this.phase !== "day") return;
+    await this.enterVote();
+  }
+
+  private async enterVote(): Promise<void> {
+    this.phase = "vote";
+    this.arm(VOTE_MS, () => void this.endVote());
+    this.voteMsg = await this.deps.channel.send(
+      renderVote(this.names, this.state!.players),
+    );
+  }
+
+  /**
+   * Tally the votes once (idempotent — the timer and the last `vote` can race),
+   * freeze the deaths, then move to reveal.
+   */
+  private async endVote(): Promise<void> {
+    if (this.phase !== "vote") return;
+    if (this.activeTimer !== undefined) {
+      this.deps.clearTimer(this.activeTimer);
+      this.activeTimer = undefined;
+    }
+    const { deaths } = tallyVotes(this.state!.votes, this.state!.players);
+    this.deaths = deaths;
+    await this.enterReveal();
+  }
+
+  private async enterReveal(): Promise<void> {
+    // TASK-12 STUB — Task 13 adds decideWinner + renderReveal + onEnd.
+    this.phase = "reveal";
   }
 
   async abort(reason: string): Promise<void> {
@@ -213,8 +250,21 @@ export class GameSession implements GameSessionHandle {
     );
   }
 
-  async skip(_by: string): Promise<void> {
-    throw new Error("hindi pwede 'yan ngayon");
+  async skip(by: string): Promise<void> {
+    if (by !== this.hostId) throw new Error("host lang ang pwedeng mag-skip");
+    switch (this.phase) {
+      case "night":
+        await this.endNight();
+        return;
+      case "day":
+        await this.endDay();
+        return;
+      case "vote":
+        await this.endVote();
+        return;
+      default:
+        throw new Error("wala namang pwedeng i-skip ngayon");
+    }
   }
 
   async act(playerId: string, action: NightAction): Promise<void> {
@@ -232,12 +282,24 @@ export class GameSession implements GameSessionHandle {
     if (!ACTION_KINDS[role].includes(action.kind)) {
       throw new Error("mali ang aksyon para sa role mo");
     }
+    if (action.playerId !== playerId) {
+      throw new Error("hindi tugma ang aksyon sa manlalaro");
+    }
     state.nightActions.push(action);
     if (this.allActingPlayersActed()) await this.endNight();
   }
 
-  async vote(_playerId: string, _target: string): Promise<void> {
-    throw new Error("hindi pwede 'yan ngayon");
+  async vote(playerId: string, target: string): Promise<void> {
+    if (this.phase !== "vote" || this.state === undefined) {
+      throw new Error("hindi pwede 'yan ngayon");
+    }
+    const state = this.state;
+    if (!state.players.includes(playerId)) throw new Error("wala ka sa laro");
+    if (!state.players.includes(target)) throw new Error("wala sa laro ang binoto mo");
+    state.votes[playerId] = target;
+    if (Object.keys(state.votes).length === state.players.length) {
+      await this.endVote();
+    }
   }
 }
 

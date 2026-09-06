@@ -42,6 +42,7 @@ its messages) for group-chat banter with per-channel memory.
   or just say **"amigo"** in your message (whole word, any case). The reply is
   streamed: it posts as soon as the first words land and edits itself in place as
   the rest arrives. 5s per-user cooldown.
+- **`/forget`** — wipes my stored memory of the channel's conversation. Fresh start.
 - **`/study`** — toggles study mode for the channel. While on, `@mention` chat uses a
   focused-tutor persona instead of the group-chat one: it explains a concept with a
   worked example and a checking question, and on "quiz me" it drills you on whatever's

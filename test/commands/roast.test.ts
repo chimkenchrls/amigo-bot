@@ -35,6 +35,7 @@ const ctx = () => ({
     size: () => 0,
   },
   studyMode: { has: () => false, toggle: () => true, off: () => {} },
+  store: { append: () => {}, recent: () => [], trim: () => {}, purgeChannel: () => {} },
   rng: () => 0.1, // ROAST
 });
 

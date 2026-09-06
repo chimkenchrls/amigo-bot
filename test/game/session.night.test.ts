@@ -9,6 +9,17 @@ describe("session night", () => {
     await expect(s.act("zzz", { kind: "noop", playerId: "zzz" })).rejects.toThrow();
   });
 
+  it("rejects act() whose payload playerId is not the caller", async () => {
+    const { s, timers } = await startedGame();
+    // "a" tries to submit an action attributed to "b" — rejected outright
+    await expect(s.act("a", { kind: "noop", playerId: "b" })).rejects.toThrow();
+    // the spoof recorded nothing, so the night still runs its full course
+    expect(s.phase).toBe("night");
+    timers.find((t) => t.ms === NIGHT_MS)!.fn();
+    await Promise.resolve();
+    expect(s.phase).toBe("day");
+  });
+
   it("advances to day when the night timer fires", async () => {
     const { s, timers } = await startedGame();
     const nightTimer = timers.find((t) => t.ms === NIGHT_MS)!;

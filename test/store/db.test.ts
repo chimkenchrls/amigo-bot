@@ -25,7 +25,7 @@ describe("openDatabase", () => {
       name: string;
     }[];
     expect(factCols.map((c) => c.name).sort()).toEqual(
-      ["content", "created_at", "created_by", "id", "scope", "scope_id"].sort(),
+      ["content", "created_at", "created_by", "id", "scope", "scope_id", "source"].sort(),
     );
   });
 

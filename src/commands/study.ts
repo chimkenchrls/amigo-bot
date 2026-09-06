@@ -5,7 +5,7 @@ const ON =
   "📚 **Study mode on.** Paste your notes or name a topic, then `@mention` me to " +
   "have it explained, or say **quiz me** and I'll drill you on it. `/study` again to stop.";
 const OFF = "📕 **Study mode off** — back to normal.";
-const BUSY = "kanina pa may laro dito ah — `/study` na lang pag tapos na.";
+const BUSY = "There's a game running here — try `/study` again once it wraps up.";
 
 export const studyCommand: Command = {
   data: new SlashCommandBuilder()

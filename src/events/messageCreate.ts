@@ -1,6 +1,6 @@
 import type { Message } from "discord.js";
 import { DISCORD_UNKNOWN_MESSAGE } from "../constants.js";
-import { evaluateTrigger } from "../chat/trigger.js";
+import { evaluateTrigger, mentionsName } from "../chat/trigger.js";
 import { handleChat, type ChatContext, type ChatDeps } from "../chat/handler.js";
 import type { BotMessageCache } from "../lib/botMessages.js";
 import type { GameRegistry } from "../game/registry.js";
@@ -43,9 +43,11 @@ export function onMessageCreate(
     if (deps.registry.has(message.channelId)) return;
 
     const mentionsBot = message.mentions.users.has(botId);
-    const replyToBot = mentionsBot
-      ? false
-      : await isReplyToBot(message, botId, deps.botMessages);
+    const named = mentionsName(message.content);
+    const replyToBot =
+      mentionsBot || named
+        ? false
+        : await isReplyToBot(message, botId, deps.botMessages);
     const outcome = evaluateTrigger(
       {
         authorBot: message.author.bot,

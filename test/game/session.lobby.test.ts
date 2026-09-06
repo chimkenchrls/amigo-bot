@@ -46,6 +46,13 @@ describe("session lobby", () => {
     expect(Object.keys(s.showRole("h")).length).toBeGreaterThan(0);
   });
 
+  it("abort is idempotent under concurrent calls", async () => {
+    const { deps } = fakeDeps();
+    const s = await createGameSession("h", deps);
+    await Promise.all([s.abort("x"), s.abort("x")]);
+    expect(deps.onEnd).toHaveBeenCalledTimes(1);
+  });
+
   it("lobby timeout aborts the game and calls onEnd", async () => {
     const { deps, timers } = fakeDeps();
     const s = await createGameSession("h", deps);

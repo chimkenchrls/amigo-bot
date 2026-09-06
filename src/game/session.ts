@@ -125,8 +125,8 @@ export class GameSession implements GameSessionHandle {
 
   private async enterNight(): Promise<void> {
     this.phase = "night";
-    this.nightMsg = await this.deps.channel.send(renderNight(null));
     this.arm(NIGHT_MS, () => void this.endNight());
+    this.nightMsg = await this.deps.channel.send(renderNight(null));
   }
 
   private endNight(): void {
@@ -135,14 +135,16 @@ export class GameSession implements GameSessionHandle {
 
   async abort(reason: string): Promise<void> {
     if (this.phase === "done") return;
-    if (this.activeTimer !== undefined) this.deps.clearTimer(this.activeTimer);
-    this.activeTimer = undefined;
+    this.phase = "done";
+    if (this.activeTimer !== undefined) {
+      this.deps.clearTimer(this.activeTimer);
+      this.activeTimer = undefined;
+    }
     try {
       await this.deps.channel.send({ content: `Natigil ang laro: ${reason}.` });
     } catch {
       /* best effort */
     }
-    this.phase = "done";
     this.deps.onEnd(this.channelId);
   }
 

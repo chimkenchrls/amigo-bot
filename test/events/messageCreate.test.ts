@@ -18,7 +18,8 @@ function baseDeps() {
     model: "m",
     getBotUserId: () => "BOT",
     studyMode: { has: vi.fn(() => false), toggle: vi.fn(() => true), off: vi.fn() },
-    facts: { forChat: vi.fn(() => ({ channel: [], guild: [] })), add: vi.fn(() => null), list: vi.fn(() => []), remove: vi.fn(() => false), count: vi.fn(() => 0) },
+    facts: { forChat: vi.fn(() => ({ channel: [], guild: [] })), add: vi.fn(() => null), list: vi.fn(() => []), remove: vi.fn(() => false), count: vi.fn(() => 0), replaceAuto: vi.fn() },
+    autoMemory: { note: vi.fn(), start: vi.fn(), stop: vi.fn(), tick: vi.fn(async () => {}) },
     registry: {
       has: vi.fn(() => false),
       get: vi.fn(() => undefined),
@@ -181,6 +182,21 @@ describe("onMessageCreate", () => {
     const m = msg({ mentions: { users: new Map([["BOT", {}]]) } });
     await onMessageCreate(deps as never)(m as never);
     expect(inner).not.toHaveBeenCalled();
+  });
+
+  it("records channel activity for a human message even when a game is running", async () => {
+    const deps = baseDeps();
+    (deps.registry.has as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    const m = msg({ content: "just chatting" });
+    await onMessageCreate(deps as never)(m as never);
+    expect(deps.autoMemory.note).toHaveBeenCalledWith("c");
+  });
+
+  it("does not record activity for a bot message", async () => {
+    const deps = baseDeps();
+    const m = msg({ author: { bot: true, id: "u1" } });
+    await onMessageCreate(deps as never)(m as never);
+    expect(deps.autoMemory.note).not.toHaveBeenCalled();
   });
 
   it("invokes the chat handler normally when no game is active", async () => {

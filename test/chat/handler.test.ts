@@ -5,6 +5,7 @@ import {
   TYPING_KEEPALIVE_MS,
   CHAT_COOLDOWN_MS,
   NAME_TRIGGER_COOLDOWN_MS,
+  MAX_AUTO_FACTS,
 } from "../../src/constants.js";
 import {
   RateLimitError,
@@ -55,6 +56,7 @@ function deps(over: Partial<Parameters<typeof handleChat>[0]> = {}) {
       list: vi.fn(() => []),
       remove: vi.fn(),
       count: vi.fn(() => 0),
+      replaceAuto: vi.fn(),
     },
     ...over,
   };
@@ -237,20 +239,40 @@ describe("handleChat", () => {
     expect((generateReplyStream as any).mock.calls[0][1].studyMode).toBe(false);
   });
 
-  it("loads the channel's saved facts and passes them to the stream", async () => {
+  it("loads saved facts, user notes first then capped auto notes, and passes them to the stream", async () => {
     (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
     const d = deps();
     (d.facts.forChat as any).mockReturnValue({
-      channel: [{ content: "Eli hates cilantro" }],
-      guild: [{ content: "timezone is PHT" }],
+      channel: [
+        { content: "auto A", source: "auto" },
+        { content: "Eli hates cilantro", source: "user" },
+        { content: "auto B", source: "auto" },
+      ],
+      guild: [{ content: "timezone is PHT", source: "user" }],
     });
     const c = ctx();
     await handleChat(d)(c);
     expect(d.facts.forChat).toHaveBeenCalledWith("c", "g");
     expect((generateReplyStream as any).mock.calls[0][1].facts).toEqual({
-      channel: ["Eli hates cilantro"],
+      channel: ["Eli hates cilantro", "auto A", "auto B"],
       guild: ["timezone is PHT"],
     });
+  });
+
+  it("caps injected auto notes at MAX_AUTO_FACTS", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
+    const d = deps();
+    (d.facts.forChat as any).mockReturnValue({
+      channel: Array.from({ length: MAX_AUTO_FACTS + 4 }, (_, i) => ({
+        content: `auto ${i}`,
+        source: "auto",
+      })),
+      guild: [],
+    });
+    await handleChat(d)(ctx());
+    expect((generateReplyStream as any).mock.calls[0][1].facts.channel.length).toBe(
+      MAX_AUTO_FACTS,
+    );
   });
 
   it("clamps oversized inbound text before the AI call and before persisting", async () => {

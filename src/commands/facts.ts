@@ -17,6 +17,11 @@ export const factsCommand: Command = {
         .setName("forget")
         .setDescription("delete note #N from the list")
         .setMinValue(1),
+    )
+    .addBooleanOption((o) =>
+      o
+        .setName("wipe")
+        .setDescription("clear the notes I picked up on my own (keeps your saved ones)"),
     ),
   async execute(interaction, ctx) {
     const serverWide = interaction.options.getBoolean("server") ?? false;
@@ -30,6 +35,7 @@ export const factsCommand: Command = {
 
     const list = ctx.facts.list(scope, scopeId);
     const forget = interaction.options.getInteger("forget");
+    const wipe = interaction.options.getBoolean("wipe") ?? false;
 
     if (forget !== null) {
       const target = list[forget - 1];
@@ -46,6 +52,26 @@ export const factsCommand: Command = {
       return;
     }
 
+    if (wipe) {
+      const n = ctx.facts.count(scope, scopeId, "auto");
+      if (n === 0) {
+        await interaction.reply({
+          content: "wala naman akong sariling napulot dito na buburahin",
+          flags: EPH,
+        });
+        return;
+      }
+      ctx.facts.replaceAuto(scope, scopeId, []);
+      ctx.logger.info("auto facts wiped", { scope, scopeId, n });
+      await interaction.reply({
+        content:
+          `okay, binura ko 'yung ${n} auto-note dito. pero baka mapulot ko ulit ` +
+          "habang nag-uusap kayo — gamitin ang `/forget` kung gusto mong burahin din ang usapan.",
+        flags: EPH,
+      });
+      return;
+    }
+
     if (list.length === 0) {
       await interaction.reply({
         content: serverWide
@@ -56,11 +82,16 @@ export const factsCommand: Command = {
       return;
     }
 
-    const body = list.map((f, i) => `${i + 1}. ${f.content}`).join("\n");
+    const body = list
+      .map(
+        (f, i) =>
+          `${i + 1}. ${f.content}${f.source === "auto" ? "  ·picked up" : ""}`,
+      )
+      .join("\n");
     await interaction.reply({
       content:
         `**${serverWide ? "Server-wide notes" : "Notes for this channel"}:**\n${body}\n\n` +
-        "burahin ang isa: `/facts forget:<number>`",
+        "burahin ang isa: `/facts forget:<number>` — o `/facts wipe:true` para sa mga `·picked up`",
       flags: EPH,
     });
   },

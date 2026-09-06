@@ -8,6 +8,7 @@ import {
   MAX_CHAT_INPUT_CHARS,
   STREAM_EDIT_INTERVAL_MS,
   TYPING_KEEPALIVE_MS,
+  MAX_AUTO_FACTS,
 } from "../constants.js";
 import type { Cooldown } from "../lib/cooldown.js";
 import type { MessageStore } from "../store/messages.js";
@@ -101,13 +102,22 @@ export function handleChat(deps: ChatDeps) {
 
       try {
         const savedFacts = deps.facts.forChat(ctx.channelId, ctx.guildId);
+        const channelNotes = [
+          ...savedFacts.channel
+            .filter((f) => f.source === "user")
+            .map((f) => f.content),
+          ...savedFacts.channel
+            .filter((f) => f.source === "auto")
+            .map((f) => f.content)
+            .slice(0, MAX_AUTO_FACTS),
+        ];
         for await (const delta of generateReplyStream(deps.genai, {
           history,
           userTurn,
           model: deps.model,
           studyMode: deps.studyMode.has(ctx.channelId),
           facts: {
-            channel: savedFacts.channel.map((f) => f.content),
+            channel: channelNotes,
             guild: savedFacts.guild.map((f) => f.content),
           },
         })) {

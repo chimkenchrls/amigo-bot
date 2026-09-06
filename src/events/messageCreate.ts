@@ -4,11 +4,13 @@ import { evaluateTrigger, mentionsName } from "../chat/trigger.js";
 import { handleChat, type ChatContext, type ChatDeps } from "../chat/handler.js";
 import type { BotMessageCache } from "../lib/botMessages.js";
 import type { GameRegistry } from "../game/registry.js";
+import type { AutoMemory } from "../memory/autoMemory.js";
 
 export type MessageDeps = ChatDeps & {
   botMessages: BotMessageCache;
   getBotUserId: () => string;
   registry: GameRegistry;
+  autoMemory: AutoMemory;
 };
 
 export async function isReplyToBot(
@@ -39,6 +41,11 @@ export function onMessageCreate(
     // and system messages can never trigger a reply, and a message that already
     // @mentions the bot doesn't need the reply-chain check at all.
     if (message.author.bot || message.system) return;
+
+    // Feed the auto-memory tracker on every human message — even in a channel
+    // with a game running or chat otherwise suppressed; what happened there is
+    // still worth remembering.
+    deps.autoMemory.note(message.channelId);
 
     if (deps.registry.has(message.channelId)) return;
 

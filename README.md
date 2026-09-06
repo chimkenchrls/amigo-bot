@@ -32,6 +32,8 @@ its messages) for group-chat banter with per-channel memory.
   against live APIs, with timing (needs a filled-in `.env`; use a local png/jpeg/webp/gif)
 - `npx tsx scripts/game-smoke.ts` — drives a full scripted 3-player Werewolf game end to
   end, with the night/day/reveal narration hitting live Gemini (needs a filled-in `.env`)
+- `npx tsx scripts/memory-smoke.ts` — runs the auto-memory distiller twice over a
+  canned transcript against live Gemini (needs a filled-in `.env`)
 
 ## How it works
 
@@ -44,10 +46,17 @@ its messages) for group-chat banter with per-channel memory.
   the rest arrives. 5s per-user cooldown for a direct ping, 30s for a bare "amigo".
 - **`/remember <text> [server]`** — save a note I'll keep in mind for this channel
   (or the whole server with `server:true`). Saved notes get folded into every reply.
-- **`/facts [server] [forget:N]`** — show the saved notes (numbered, ephemeral);
-  `forget:2` deletes note #2. Capped at 40 notes per scope.
+- **`/facts [server] [forget:N] [wipe]`** — show the saved notes (numbered,
+  ephemeral); `forget:2` deletes note #2. Notes AmIgo picked up on its own are
+  tagged `·picked up`; `wipe:true` clears just those. Capped at 40 saved notes
+  per scope.
 - **`/forget`** — wipes my stored memory of the channel's *conversation* (not the
   saved notes — those stick around).
+- **Auto-memory** — when a channel's conversation winds down, AmIgo quietly
+  distils it into a few durable notes (ongoing plans, facts about the regulars,
+  running jokes) and folds them into later replies. They show up in `/facts`
+  tagged `·picked up` and clear with `/facts wipe:true`. Always on; nothing is
+  logged.
 - **`/study`** — toggles study mode for the channel. While on, `@mention` chat uses a
   focused-tutor persona instead of the group-chat one: it explains a concept with a
   worked example and a checking question, and on "quiz me" it drills you on whatever's

@@ -9,6 +9,7 @@ import { openDatabase } from "./store/db.js";
 import { createMessageStore } from "./store/messages.js";
 import { createGenAI } from "./ai/client.js";
 import { createClient } from "./client.js";
+import { createRegistry } from "./game/registry.js";
 import { commands } from "./commands/index.js";
 import { registerReady, botUserId } from "./events/ready.js";
 import { routeInteraction } from "./events/interactionCreate.js";
@@ -24,11 +25,12 @@ const store = createMessageStore(db);
 const cooldown = createCooldown();
 const botMessages = createBotMessageCache();
 const genai = createGenAI(config.geminiApiKey);
+const registry = createRegistry();
 
 const client = createClient();
 registerReady(client, logger);
 
-const commandCtx = { cooldown, genai, logger, model: config.model };
+const commandCtx = { cooldown, genai, logger, model: config.model, registry };
 client.on(
   "interactionCreate",
   routeInteraction({ commands, ctx: commandCtx, logger }),

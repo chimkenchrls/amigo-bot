@@ -71,16 +71,16 @@ export function onMessageCreate(
       reply: async (content) => {
         try {
           const sent = await message.reply(content);
-          return { id: sent.id };
+          return { id: sent.id, edit: async (c) => void (await sent.edit(c)) };
         } catch (err) {
           if (!isUnknownMessage(err)) throw err;
           const sent = await channel.send(content);
-          return { id: sent.id };
+          return { id: sent.id, edit: async (c) => void (await sent.edit(c)) };
         }
       },
       followUp: async (content) => {
         const sent = await channel.send(content);
-        return { id: sent.id };
+        return { id: sent.id, edit: async (c) => void (await sent.edit(c)) };
       },
       react: (emoji) => message.react(emoji).then(() => undefined),
     };

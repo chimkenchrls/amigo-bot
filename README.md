@@ -1,8 +1,8 @@
 # AmIgo
 
-A laid-back, slightly chaotic Discord bot: `/roast` a photo (roast or hype, coin-flip)
-and `@mention` it (or reply to one of its messages) for group-chat banter with
-per-channel memory.
+A laid-back, slightly chaotic Discord bot that talks in deep, humor-heavy Tagalog:
+`/roast` a photo (roast or hype, coin-flip) and `@mention` it (or reply to one of
+its messages) for group-chat banter with per-channel memory.
 
 ## Setup
 
@@ -28,8 +28,8 @@ per-channel memory.
 
 - `npm test` — unit + store + mocked-AI tests
 - `npm run typecheck` — TypeScript, no emit
-- `npx tsx scripts/smoke.ts <image>` — one real roast + one real chat reply against
-  live APIs (needs a filled-in `.env`; use a local png/jpeg/webp/gif)
+- `npx tsx scripts/smoke.ts <image>` — one real roast + one real streamed chat reply
+  against live APIs, with timing (needs a filled-in `.env`; use a local png/jpeg/webp/gif)
 
 ## How it works
 
@@ -37,7 +37,8 @@ per-channel memory.
   hype of whatever it sees. Accepts PNG / JPEG / WebP / GIF up to 4 MB. 30s
   per-user cooldown.
 - **Chat** — the bot replies when you `@mention` it or reply to one of its
-  messages. 5s per-user cooldown.
+  messages. The reply is streamed: it posts as soon as the first words land and
+  edits itself in place as the rest arrives. 5s per-user cooldown.
 
 ## Data
 

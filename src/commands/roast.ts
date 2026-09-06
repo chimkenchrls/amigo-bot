@@ -6,7 +6,11 @@ import {
   type AttachmentLike,
 } from "../lib/image.js";
 import { pickRoastMode, roastImage, type RoastMode } from "../ai/roast.js";
-import { AiUnavailableError, RateLimitError } from "../ai/errors.js";
+import {
+  AiClientError,
+  AiUnavailableError,
+  RateLimitError,
+} from "../ai/errors.js";
 import type { Command, CommandCtx } from "./types.js";
 
 export type { Command, CommandCtx } from "./types.js";
@@ -23,12 +27,12 @@ export interface RoastReply {
 }
 
 export function badImageContent(attachment: AttachmentLike | null): string | null {
-  if (!attachment) return "you gotta actually upload a photo";
+  if (!attachment) return "mag-upload ka muna ng actual na photo, boss";
   const check = validateImage(attachment);
   if (check.ok) return null;
   return check.reason === "too-large"
-    ? "that image is too chonky (4MB max)"
-    : "that's not a photo i can work with";
+    ? "ang laki ng file na 'yan (4MB lang ang max)"
+    : "hindi photo 'yan na kaya kong i-work";
 }
 
 export async function runRoast(
@@ -39,12 +43,15 @@ export async function runRoast(
   if (badImage !== null || !input.attachment) {
     return {
       kind: "bad-image",
-      content: badImage ?? "you gotta actually upload a photo",
+      content: badImage ?? "mag-upload ka muna ng actual na photo, boss",
     };
   }
   const check = validateImage(input.attachment);
   if (!check.ok) {
-    return { kind: "bad-image", content: "that's not a photo i can work with" };
+    return {
+      kind: "bad-image",
+      content: "hindi photo 'yan na kaya kong i-work",
+    };
   }
 
   let encoded;
@@ -54,7 +61,7 @@ export async function runRoast(
     ctx.logger.warn("roast image fetch failed", {
       name: err instanceof Error ? err.name : "unknown",
     });
-    return { kind: "down", content: "couldn't grab that image, try again" };
+    return { kind: "down", content: "'di ko ma-fetch 'yang photo, try mo ulit" };
   }
 
   const mode = pickRoastMode(ctx.rng);
@@ -69,7 +76,7 @@ export async function runRoast(
     if (!res.ok) {
       return {
         kind: "blocked",
-        content: "my roast circuits tripped a breaker on that one",
+        content: "nag-trip ang breaker ng pang-roast ko diyan",
         mode,
       };
     }
@@ -78,14 +85,22 @@ export async function runRoast(
     if (err instanceof RateLimitError) {
       return {
         kind: "rate",
-        content: "hitting my limits — gimme a minute",
+        content: "puno na ako — chill lang, one minute",
         mode,
       };
     }
     if (err instanceof AiUnavailableError) {
       return {
         kind: "down",
-        content: "my brain's offline, try again later",
+        content: "down ang utak ko, balik ka mamaya",
+        mode,
+      };
+    }
+    if (err instanceof AiClientError) {
+      ctx.logger.error("roast failed: ai client error", { message: err.message });
+      return {
+        kind: "down",
+        content: "sira ang setup ko — 'di 'to maaayos ng retry, i-check niyo yung config/key",
         mode,
       };
     }
@@ -94,7 +109,7 @@ export async function runRoast(
       message: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
     });
-    return { kind: "down", content: "something broke, try again", mode };
+    return { kind: "down", content: "may nasira, try mo ulit", mode };
   }
 }
 
@@ -131,7 +146,7 @@ export const roastCommand: Command = {
     const cd = ctx.cooldown.check(interaction.user.id, "roast", ROAST_COOLDOWN_MS);
     if (!cd.ok) {
       await interaction.reply({
-        content: `chill — ${cd.retryAfter}s left`,
+        content: `chill lang — ${cd.retryAfter}s pa bago ka ulit`,
         flags: MessageFlags.Ephemeral,
       });
       return;

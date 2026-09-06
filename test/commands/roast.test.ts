@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MessageFlags } from "discord.js";
 import { runRoast, roastCommand } from "../../src/commands/roast.js";
-import { AiUnavailableError, RateLimitError } from "../../src/ai/errors.js";
+import {
+  AiUnavailableError,
+  RateLimitError,
+  AiClientError,
+} from "../../src/ai/errors.js";
 
 vi.mock("../../src/ai/roast.js", async (orig) => {
   const actual = (await orig()) as object;
@@ -73,6 +77,15 @@ describe("runRoast", () => {
     expect(r.kind).toBe("down");
   });
 
+  it("maps an AiClientError to a down reply that names the setup and logs it", async () => {
+    (roastImage as any).mockRejectedValue(new AiClientError("404 model gone"));
+    const c = ctx();
+    const r = await runRoast({ userId: "u", attachment: png }, c);
+    expect(r.kind).toBe("down");
+    expect(r.content).toContain("setup");
+    expect(c.logger.error).toHaveBeenCalled();
+  });
+
   it("maps an image fetch failure to down", async () => {
     (roastImage as any).mockResolvedValue({ ok: true, text: "nope" });
     (fetchImageAsBase64 as any).mockRejectedValueOnce(new Error("boom"));
@@ -131,7 +144,7 @@ describe("roastCommand.execute", () => {
     expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         flags: MessageFlags.Ephemeral,
-        content: expect.stringContaining("not a photo"),
+        content: expect.stringContaining("hindi photo"),
       }),
     );
     expect(interaction.deferReply).not.toHaveBeenCalled();

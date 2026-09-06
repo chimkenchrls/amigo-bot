@@ -1,8 +1,9 @@
 import type { GoogleGenAI } from "@google/genai";
-import { AI_TIMEOUT_MS } from "../constants.js";
+import { AI_TIMEOUT_MS, ROAST_THINKING_LEVEL } from "../constants.js";
 import { ROAST_PERSONA } from "./persona.js";
 import { SAFETY_SETTINGS } from "./safety.js";
 import {
+  AiClientError,
   AiUnavailableError,
   RateLimitError,
   classifyAiError,
@@ -17,16 +18,18 @@ export function pickRoastMode(rng: () => number = Math.random): RoastMode {
 export function buildRoastPrompt(mode: RoastMode): string {
   if (mode === "ROAST") {
     return (
-      "Roast what you see in this image. Savage, witty, roast-battle energy — " +
-      "2-3 sentences, playful-mean not hateful. No slurs, no jabs at protected " +
+      "Roast what you see in this image. Reply in casual Taglish (mostly Tagalog, " +
+      "some English mixed in). Savage, witty, roast-battle energy — 2-3 " +
+      "sentences, playful-mean not hateful. No slurs, no jabs at protected " +
       "characteristics. If the subject looks like a minor, refuse and say you " +
       "don't roast kids."
     );
   }
   return (
-    "Hype up what you see in this image. Absurd, over-the-top hype-man praise — " +
-    "treat it as the greatest thing ever photographed. 2-3 sentences of " +
-    "unhinged enthusiasm. No slurs."
+    "Hype up what you see in this image. Reply in casual Taglish (mostly Tagalog, " +
+    "some English mixed in). Absurd, over-the-top hype-man praise — treat it as " +
+    "the greatest thing ever photographed. 2-3 sentences of unhinged enthusiasm. " +
+    "No slurs."
   );
 }
 
@@ -62,6 +65,7 @@ export async function roastImage(
       systemInstruction: ROAST_PERSONA,
       safetySettings: SAFETY_SETTINGS,
       temperature: 1.0,
+      thinkingConfig: { thinkingLevel: ROAST_THINKING_LEVEL },
       httpOptions: { timeout: AI_TIMEOUT_MS },
     },
   };
@@ -76,6 +80,8 @@ export async function roastImage(
       lastErr = err;
       const kind = classifyAiError(err);
       if (kind === "rate_limit") throw new RateLimitError();
+      if (kind === "client_error")
+        throw new AiClientError(err instanceof Error ? err.message : String(err));
       if (kind !== "unavailable") throw err instanceof Error ? err : new Error(String(err));
       if (attempt === 0) await sleep(500);
     }

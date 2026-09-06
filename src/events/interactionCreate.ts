@@ -8,7 +8,7 @@ export interface RouteDeps {
   logger: Logger;
 }
 
-const ERR_LINE = "ugh, that broke on my end. try again in a sec";
+const ERR_LINE = "naku, may nag-error sa gilid ko. try mo ulit saglit";
 
 export function routeInteraction(
   deps: RouteDeps,
@@ -21,7 +21,7 @@ export function routeInteraction(
       deps.logger.warn("unknown command", { name: interaction.commandName });
       await interaction
         .reply({
-          content: "i don't know that one",
+          content: "hindi ko alam 'yang utos na 'yan",
           flags: MessageFlags.Ephemeral,
         })
         .catch(() => {});

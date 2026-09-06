@@ -1,13 +1,37 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleChat } from "../../src/chat/handler.js";
-import { MAX_CHAT_INPUT_CHARS } from "../../src/constants.js";
-import { RateLimitError, AiUnavailableError } from "../../src/ai/errors.js";
+import {
+  MAX_CHAT_INPUT_CHARS,
+  TYPING_KEEPALIVE_MS,
+} from "../../src/constants.js";
+import {
+  RateLimitError,
+  AiUnavailableError,
+  AiClientError,
+} from "../../src/ai/errors.js";
 
 vi.mock("../../src/ai/conversation.js", async (orig) => {
   const actual = (await orig()) as object;
-  return { ...actual, generateReply: vi.fn() };
+  return { ...actual, generateReplyStream: vi.fn() };
 });
-import { generateReply } from "../../src/ai/conversation.js";
+import { generateReplyStream } from "../../src/ai/conversation.js";
+
+async function* streamOf(parts: string[]): AsyncGenerator<string> {
+  for (const p of parts) yield p;
+}
+
+async function* streamThenThrow(
+  parts: string[],
+  err: unknown,
+): AsyncGenerator<string> {
+  for (const p of parts) yield p;
+  throw err;
+}
+
+async function* streamThrow(err: unknown): AsyncGenerator<string> {
+  throw err;
+  yield ""; // unreachable, satisfies the generator type
+}
 
 function deps(over: Partial<Parameters<typeof handleChat>[0]> = {}) {
   return {
@@ -27,6 +51,7 @@ function deps(over: Partial<Parameters<typeof handleChat>[0]> = {}) {
 }
 
 function ctx(over: Partial<Parameters<ReturnType<typeof handleChat>>[0]> = {}) {
+  const edit = vi.fn(async () => {});
   return {
     channelId: "c",
     userId: "u",
@@ -34,39 +59,67 @@ function ctx(over: Partial<Parameters<ReturnType<typeof handleChat>>[0]> = {}) {
     text: "hello",
     guildId: "g",
     sendTyping: vi.fn(async () => {}),
-    reply: vi.fn(async () => ({ id: "r1" })),
-    followUp: vi.fn(async () => ({ id: "r2" })),
+    reply: vi.fn(async () => ({ id: "r1", edit })),
+    followUp: vi.fn(async () => ({ id: "r2", edit: vi.fn(async () => {}) })),
     react: vi.fn(async () => {}),
+    edit,
     ...over,
   };
 }
 
 describe("handleChat", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("reacts and does nothing else when on cooldown", async () => {
     const d = deps();
     d.cooldown.check = vi.fn(() => ({ ok: false, retryAfter: 3 }));
     const c = ctx();
     await handleChat(d)(c);
     expect(c.react).toHaveBeenCalledWith("🥱");
-    expect(generateReply).not.toHaveBeenCalled();
+    expect(generateReplyStream).not.toHaveBeenCalled();
     expect(c.reply).not.toHaveBeenCalled();
   });
 
-  it("loads history, replies, and persists both turns on success", async () => {
-    (generateReply as any).mockResolvedValue({ ok: true, text: "sup" });
+  it("posts the first delta, edits to the full text, and persists both turns", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["ku", "musta"]));
     const d = deps();
     const c = ctx();
     await handleChat(d)(c);
     expect(d.store.recent).toHaveBeenCalledWith("c", 16);
-    expect(c.reply).toHaveBeenCalledWith("sup");
-    expect(d.store.append).toHaveBeenNthCalledWith(1, "c", "user", "Dana: hello");
-    expect(d.store.append).toHaveBeenNthCalledWith(2, "c", "model", "sup");
-    expect(d.store.trim).toHaveBeenCalledWith("c", 30);
+    expect(c.reply).toHaveBeenCalledWith("ku");
+    expect(c.edit).toHaveBeenLastCalledWith("kumusta");
     expect(d.botMessages.remember).toHaveBeenCalledWith("r1");
+    expect(d.store.append).toHaveBeenNthCalledWith(1, "c", "user", "Dana: hello");
+    expect(d.store.append).toHaveBeenNthCalledWith(2, "c", "model", "kumusta");
+    expect(d.store.trim).toHaveBeenCalledWith("c", 30);
   });
 
-  it("does not persist when the model is blocked", async () => {
-    (generateReply as any).mockResolvedValue({ ok: false, reason: "blocked" });
+  it("re-arms the typing indicator while the reply is still generating", async () => {
+    vi.useFakeTimers();
+    try {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => {
+        release = r;
+      });
+      async function* slow(): AsyncGenerator<string> {
+        await gate;
+        yield "sup";
+      }
+      (generateReplyStream as any).mockReturnValue(slow());
+      const d = deps();
+      const c = ctx();
+      const p = handleChat(d)(c);
+      await vi.advanceTimersByTimeAsync(TYPING_KEEPALIVE_MS * 2 + 100);
+      expect((c.sendTyping as any).mock.calls.length).toBeGreaterThanOrEqual(3);
+      release();
+      await p;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not persist when the stream yields nothing", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf([]));
     const d = deps();
     const c = ctx();
     await handleChat(d)(c);
@@ -75,8 +128,8 @@ describe("handleChat", () => {
     expect(d.store.trim).not.toHaveBeenCalled();
   });
 
-  it("sends an in-character line and does not persist on RateLimitError", async () => {
-    (generateReply as any).mockRejectedValue(new RateLimitError());
+  it("sends an in-character line and does not persist on a pre-stream RateLimitError", async () => {
+    (generateReplyStream as any).mockReturnValue(streamThrow(new RateLimitError()));
     const d = deps();
     const c = ctx();
     await handleChat(d)(c);
@@ -84,8 +137,10 @@ describe("handleChat", () => {
     expect(d.store.append).not.toHaveBeenCalled();
   });
 
-  it("sends an in-character line and does not persist on AiUnavailableError", async () => {
-    (generateReply as any).mockRejectedValue(new AiUnavailableError());
+  it("sends an in-character line and does not persist on a pre-stream AiUnavailableError", async () => {
+    (generateReplyStream as any).mockReturnValue(
+      streamThrow(new AiUnavailableError()),
+    );
     const d = deps();
     const c = ctx();
     await handleChat(d)(c);
@@ -93,8 +148,21 @@ describe("handleChat", () => {
     expect(d.store.append).not.toHaveBeenCalled();
   });
 
-  it("sends a crash line and does not reject on a generic error", async () => {
-    (generateReply as any).mockRejectedValue(new Error("boom"));
+  it("sends a distinct setup line and does not persist on a pre-stream AiClientError", async () => {
+    (generateReplyStream as any).mockReturnValue(
+      streamThrow(new AiClientError("404 model gone")),
+    );
+    const d = deps();
+    const c = ctx();
+    await handleChat(d)(c);
+    expect(c.reply).toHaveBeenCalledTimes(1);
+    expect(c.reply).toHaveBeenCalledWith(expect.stringContaining("setup"));
+    expect(d.store.append).not.toHaveBeenCalled();
+    expect(d.logger.error).toHaveBeenCalled();
+  });
+
+  it("sends a crash line and does not reject on a generic pre-stream error", async () => {
+    (generateReplyStream as any).mockReturnValue(streamThrow(new Error("boom")));
     const d = deps();
     const c = ctx();
     await expect(handleChat(d)(c)).resolves.toBeUndefined();
@@ -103,7 +171,7 @@ describe("handleChat", () => {
   });
 
   it("logs a caught Error with its stack in the meta", async () => {
-    (generateReply as any).mockRejectedValue(new Error("boom"));
+    (generateReplyStream as any).mockReturnValue(streamThrow(new Error("boom")));
     const d = deps();
     const c = ctx();
     await handleChat(d)(c);
@@ -116,14 +184,28 @@ describe("handleChat", () => {
     );
   });
 
+  it("keeps and persists the partial text when the stream fails mid-reply", async () => {
+    (generateReplyStream as any).mockReturnValue(
+      streamThenThrow(["kal", "ahati"], new AiUnavailableError()),
+    );
+    const d = deps();
+    const c = ctx();
+    await handleChat(d)(c);
+    expect(c.reply).toHaveBeenCalledWith("kal");
+    expect(c.edit).toHaveBeenLastCalledWith("kalahati");
+    expect(d.store.append).toHaveBeenNthCalledWith(2, "c", "model", "kalahati");
+    expect(d.logger.warn).toHaveBeenCalled();
+  });
+
   it("clamps oversized inbound text before the AI call and before persisting", async () => {
-    (generateReply as any).mockResolvedValue({ ok: true, text: "sup" });
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
     const d = deps();
     const c = ctx({ text: "x".repeat(5000) });
     await handleChat(d)(c);
     const prefixLen = "Dana: ".length;
     const cap = MAX_CHAT_INPUT_CHARS + prefixLen;
-    const sentTurn = (generateReply as any).mock.calls[0][1].userTurn as string;
+    const sentTurn = (generateReplyStream as any).mock.calls[0][1]
+      .userTurn as string;
     expect(sentTurn.length).toBeLessThanOrEqual(cap);
     const appended = (d.store.append as any).mock.calls.find(
       (call: unknown[]) => call[1] === "user",

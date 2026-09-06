@@ -44,7 +44,7 @@ describe("routeInteraction", () => {
     expect(i.reply).toHaveBeenCalledWith(
       expect.objectContaining({
         flags: MessageFlags.Ephemeral,
-        content: expect.stringContaining("i don't know"),
+        content: expect.stringContaining("hindi ko alam"),
       }),
     );
     expect(logger.warn).toHaveBeenCalled();

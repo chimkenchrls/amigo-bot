@@ -4,7 +4,11 @@ import {
   buildRoastPrompt,
   roastImage,
 } from "../../src/ai/roast.js";
-import { RateLimitError, AiUnavailableError } from "../../src/ai/errors.js";
+import {
+  RateLimitError,
+  AiUnavailableError,
+  AiClientError,
+} from "../../src/ai/errors.js";
 
 function fakeGenAI(impl: () => unknown) {
   return { models: { generateContent: vi.fn(impl) } } as never;
@@ -32,6 +36,9 @@ describe("buildRoastPrompt", () => {
     expect(r).not.toBe(t);
     expect(r.toLowerCase()).toContain("minor");
     expect(r.toLowerCase()).toContain("slur");
+    expect(r.toLowerCase()).toContain("taglish");
+    expect(t.toLowerCase()).toContain("taglish");
+    expect(r.toLowerCase()).not.toContain("deep");
   });
 });
 
@@ -48,7 +55,10 @@ describe("roastImage", () => {
       data: "BASE64",
     });
     expect(call.config.systemInstruction).toContain("roast");
+    expect(call.config.systemInstruction).toContain("Taglish");
+    expect(call.config.systemInstruction).not.toMatch(/deep|hindi Taglish/i);
     expect(Array.isArray(call.config.safetySettings)).toBe(true);
+    expect(call.config.thinkingConfig.thinkingLevel).toBe("LOW");
   });
 
   it("returns blocked when the model yields no text", async () => {
@@ -79,9 +89,16 @@ describe("roastImage", () => {
     expect(calls).toBe(2);
   });
 
-  it("throws original error on unknown status (no retry)", async () => {
-    const originalError = new Error("bad request");
-    (originalError as never as { status: number }).status = 400;
+  it("throws AiClientError on a 4xx (e.g. 404 model gone) without retry", async () => {
+    const genai = fakeGenAI(() => {
+      throw { status: 404, name: "ApiError", message: "model gone" };
+    });
+    await expect(roastImage(genai, params)).rejects.toBeInstanceOf(AiClientError);
+    expect((genai as never as { models: { generateContent: any } }).models.generateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("rethrows an error with no HTTP status (no retry)", async () => {
+    const originalError = new Error("weird");
     const genai = fakeGenAI(() => {
       throw originalError;
     });

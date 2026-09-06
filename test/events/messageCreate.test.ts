@@ -120,4 +120,20 @@ describe("onMessageCreate", () => {
     expect(inner).toHaveBeenCalledOnce();
     expect(inner.mock.calls[0]![0].text).toBe("still there?");
   });
+
+  it("hands the handler a reply() whose result can be edited in place", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const sentEdit = vi.fn(async () => {});
+    const m = msg({
+      mentions: { users: new Map([["BOT", {}]]) },
+      reply: vi.fn(async () => ({ id: "m1", edit: sentEdit })),
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    const passedCtx = inner.mock.calls[0]![0];
+    const handle = await passedCtx.reply("hoy");
+    expect(handle.id).toBe("m1");
+    await handle.edit("hoy, edited");
+    expect(sentEdit).toHaveBeenCalledWith("hoy, edited");
+  });
 });

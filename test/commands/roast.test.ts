@@ -26,6 +26,14 @@ const ctx = () => ({
   genai: {} as never,
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   model: "m",
+  registry: {
+    has: () => false,
+    get: () => undefined,
+    set: () => {},
+    remove: () => {},
+    abortAll: async () => {},
+    size: () => 0,
+  },
   rng: () => 0.1, // ROAST
 });
 

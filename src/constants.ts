@@ -8,7 +8,7 @@ export const CHAT_HISTORY_LOAD = 16;
 export const CHAT_HISTORY_KEEP = 30;
 export const MAX_CHAT_INPUT_CHARS = 1000;
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-export const AI_TIMEOUT_MS = 20_000;
+export const AI_TIMEOUT_MS = 15_000;
 
 // gemini-3.6-flash defaults to MEDIUM reasoning; AmIgo is a casual group-chat
 // bot, so dial it down to trade a little wit for a lot of latency.

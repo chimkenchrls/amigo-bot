@@ -23,6 +23,16 @@ describe("classifyAiError", () => {
     expect(classifyAiError(new AiUnavailableError("x"))).toBe("unavailable");
     expect(classifyAiError(new AiClientError("x"))).toBe("client_error");
   });
+  it("maps Node network-layer failures to unavailable", () => {
+    expect(classifyAiError({ code: "ECONNRESET" })).toBe("unavailable");
+    expect(classifyAiError({ code: "ETIMEDOUT" })).toBe("unavailable");
+    expect(classifyAiError({ code: "EAI_AGAIN" })).toBe("unavailable");
+    expect(classifyAiError({ code: "UND_ERR_CONNECT_TIMEOUT" })).toBe("unavailable");
+  });
+  it("maps a fetch-failed / socket-hang-up message to unavailable", () => {
+    expect(classifyAiError(new TypeError("fetch failed"))).toBe("unavailable");
+    expect(classifyAiError(new Error("socket hang up"))).toBe("unavailable");
+  });
   it("maps a non-429 4xx to client_error (permanent, don't retry)", () => {
     expect(classifyAiError({ status: 400 })).toBe("client_error");
     expect(classifyAiError({ status: 401 })).toBe("client_error");

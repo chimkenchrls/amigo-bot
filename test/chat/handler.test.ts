@@ -55,6 +55,7 @@ function deps(over: Partial<Parameters<typeof handleChat>[0]> = {}) {
       list: vi.fn(() => []),
       remove: vi.fn(),
       count: vi.fn(() => 0),
+      replaceAuto: vi.fn(),
     },
     ...over,
   };

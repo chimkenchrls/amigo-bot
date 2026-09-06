@@ -1,4 +1,4 @@
-import type { NightAction, NightResult, RoleName, SlotId } from "./types.js";
+import type { NightAction, NightResult, Outcome, RoleName, SlotId, Team } from "./types.js";
 import { selectRoleSet } from "./roles.js";
 
 export function pickRoleSet(playerCount: number): RoleName[] {
@@ -128,4 +128,48 @@ export function resolveNight(
     lines: results.get(id) ?? [],
   }));
   return { currentRoles: board, results: list };
+}
+
+export function tallyVotes(
+  votes: Record<string, string>,
+  players: string[],
+): { deaths: string[]; tally: Record<string, number> } {
+  const tally: Record<string, number> = {};
+  for (const p of players) tally[p] = 0;
+  for (const target of Object.values(votes)) {
+    if (target in tally) tally[target] = (tally[target] ?? 0) + 1;
+  }
+  const cast = Object.keys(votes).length;
+  const everyoneOneVote =
+    cast === players.length && Object.values(tally).every((n) => n === 1);
+  if (everyoneOneVote) return { deaths: [], tally };
+  const max = Math.max(0, ...Object.values(tally));
+  const deaths = max === 0 ? [] : players.filter((p) => tally[p] === max);
+  return { deaths, tally };
+}
+
+export function decideWinner(
+  currentRoles: Record<SlotId, RoleName>,
+  deaths: string[],
+  players: string[],
+): Outcome {
+  const isWolf = (p: string) => currentRoles[p] === "werewolf";
+  const isTanner = (p: string) => currentRoles[p] === "tanner";
+  const wolvesInPlay = players.some(isWolf);
+  const aWolfDied = deaths.some(isWolf);
+  const aTannerDied = deaths.some(isTanner);
+
+  let winningTeam: Team;
+  if (aTannerDied && !aWolfDied) winningTeam = "tanner";
+  else if (aWolfDied) winningTeam = "village";
+  else if (!wolvesInPlay) winningTeam = deaths.length === 0 ? "village" : "werewolf";
+  else winningTeam = "werewolf";
+
+  const summary =
+    winningTeam === "village"
+      ? "Panalo ang nayon."
+      : winningTeam === "werewolf"
+        ? "Panalo ang mga lobo."
+        : "Panalo ang Tanner — nagpapatay siya ng sarili.";
+  return { winningTeam, deaths, summary };
 }

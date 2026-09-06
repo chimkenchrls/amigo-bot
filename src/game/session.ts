@@ -32,11 +32,14 @@ import { ROLES } from "./roles.js";
 import {
   DAY_MS,
   LOBBY_TIMEOUT_MS,
+  MAX_GAME_MS,
   NARRATION_TIMEOUT_MS,
   NIGHT_MS,
   REVEAL_NARRATION_TIMEOUT_MS,
   VOTE_MS,
 } from "./constants.js";
+
+const OVER_TIME_REASON = "masyadong tumagal ang laro";
 
 const MS_PER_MINUTE = 60_000;
 
@@ -102,6 +105,8 @@ export class GameSession implements GameSessionHandle {
   private revealMsg: SentMessage | undefined;
   private deaths: string[] = [];
   private activeTimer: TimerHandle | undefined;
+  private maxGameTimer: TimerHandle | undefined;
+  private readonly startedAt: number;
 
   constructor(hostId: string, deps: SessionDeps) {
     this.deps = deps;
@@ -109,6 +114,7 @@ export class GameSession implements GameSessionHandle {
     this.phase = "lobby";
     this.lobby = emptyLobby(hostId);
     this.names = { ...deps.names };
+    this.startedAt = deps.now();
   }
 
   /** Constructs the session, posts the lobby message, arms the lobby timeout. */
@@ -129,6 +135,14 @@ export class GameSession implements GameSessionHandle {
   private async init(): Promise<void> {
     this.lobbyMsg = await this.deps.channel.send(renderLobby(this.lobby, this.names));
     this.arm(LOBBY_TIMEOUT_MS, () => void this.abort("naubusan ng oras ang lobby"));
+    this.maxGameTimer = this.deps.setTimer(MAX_GAME_MS, () =>
+      void this.abort(OVER_TIME_REASON),
+    );
+  }
+
+  /** True once the wall-clock budget for a single game has been exceeded. */
+  private overTime(): boolean {
+    return this.deps.now() - this.startedAt > MAX_GAME_MS;
   }
 
   /** Arms `fn` after `ms`, clearing any previously armed timer first. */
@@ -172,6 +186,10 @@ export class GameSession implements GameSessionHandle {
   }
 
   private async enterNight(): Promise<void> {
+    if (this.overTime()) {
+      await this.abort(OVER_TIME_REASON);
+      return;
+    }
     this.phase = "night";
     this.state!.nightActions = [];
     this.arm(NIGHT_MS, () => void this.endNight());
@@ -249,6 +267,10 @@ export class GameSession implements GameSessionHandle {
   }
 
   private async enterDay(): Promise<void> {
+    if (this.overTime()) {
+      await this.abort(OVER_TIME_REASON);
+      return;
+    }
     this.phase = "day";
     this.arm(DAY_MS, () => void this.endDay());
     const minutes = Math.round(DAY_MS / MS_PER_MINUTE);
@@ -272,6 +294,10 @@ export class GameSession implements GameSessionHandle {
   }
 
   private async enterVote(): Promise<void> {
+    if (this.overTime()) {
+      await this.abort(OVER_TIME_REASON);
+      return;
+    }
     this.phase = "vote";
     this.arm(VOTE_MS, () => void this.endVote());
     this.voteMsg = await this.deps.channel.send(
@@ -295,6 +321,10 @@ export class GameSession implements GameSessionHandle {
   }
 
   private async enterReveal(): Promise<void> {
+    if (this.overTime()) {
+      await this.abort(OVER_TIME_REASON);
+      return;
+    }
     this.phase = "reveal";
     if (this.activeTimer !== undefined) {
       this.deps.clearTimer(this.activeTimer);
@@ -354,6 +384,10 @@ export class GameSession implements GameSessionHandle {
       this.deps.clearTimer(this.activeTimer);
       this.activeTimer = undefined;
     }
+    if (this.maxGameTimer !== undefined) {
+      this.deps.clearTimer(this.maxGameTimer);
+      this.maxGameTimer = undefined;
+    }
     try {
       await this.deps.channel.send({ content: `Natigil ang laro: ${reason}.` });
     } catch {
@@ -372,6 +406,10 @@ export class GameSession implements GameSessionHandle {
   }
 
   async skip(by: string): Promise<void> {
+    if (this.overTime()) {
+      await this.abort(OVER_TIME_REASON);
+      return;
+    }
     if (by !== this.hostId) throw new Error("host lang ang pwedeng mag-skip");
     switch (this.phase) {
       case "night":
@@ -389,6 +427,10 @@ export class GameSession implements GameSessionHandle {
   }
 
   async act(playerId: string, action: NightAction): Promise<void> {
+    if (this.overTime()) {
+      await this.abort(OVER_TIME_REASON);
+      return;
+    }
     if (this.phase !== "night" || this.state === undefined) {
       throw new Error("hindi pwede 'yan ngayon");
     }
@@ -411,6 +453,10 @@ export class GameSession implements GameSessionHandle {
   }
 
   async vote(playerId: string, target: string): Promise<void> {
+    if (this.overTime()) {
+      await this.abort(OVER_TIME_REASON);
+      return;
+    }
     if (this.phase !== "vote" || this.state === undefined) {
       throw new Error("hindi pwede 'yan ngayon");
     }

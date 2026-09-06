@@ -16,6 +16,9 @@ import { commands } from "./commands/index.js";
 import { registerReady, botUserId } from "./events/ready.js";
 import { routeInteraction } from "./events/interactionCreate.js";
 import { onMessageCreate } from "./events/messageCreate.js";
+import { createActivityTracker } from "./lib/activity.js";
+import { createDistiller } from "./ai/distill.js";
+import { createAutoMemory } from "./memory/autoMemory.js";
 
 const logger = createLogger(config.logLevel);
 
@@ -30,6 +33,18 @@ const botMessages = createBotMessageCache();
 const genai = createGenAI(config.geminiApiKey);
 const registry = createRegistry();
 const studyMode = createStudyMode();
+
+const activity = createActivityTracker();
+const distiller = createDistiller(genai, config.model);
+const autoMemory = createAutoMemory({
+  activity,
+  store,
+  facts,
+  distiller,
+  logger,
+  setInterval: (fn, ms) => setInterval(fn, ms),
+  clearInterval: (t) => clearInterval(t as ReturnType<typeof setInterval>),
+});
 
 const client = createClient();
 registerReady(client, logger);
@@ -52,8 +67,10 @@ client.on(
     registry,
     studyMode,
     facts,
+    autoMemory,
   }),
 );
+autoMemory.start();
 
 client.on("error", (e) =>
   logger.error("client error", {
@@ -94,6 +111,7 @@ process.on("uncaughtException", (err) => {
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     logger.info("shutting down", { sig });
+    autoMemory.stop();
     void registry
       .abortAll("AmIgo is restarting — game's over, sorry")
       .catch(() => {})

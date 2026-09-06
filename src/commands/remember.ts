@@ -48,7 +48,7 @@ export const rememberCommand: Command = {
     const fact = ctx.facts.add(scope, scopeId, text, interaction.user.id);
     if (!fact) {
       await interaction.reply({
-        content: `puno na ang notes ko dito (${MAX_FACTS_PER_SCOPE} max) — burahin mo muna 'yung iba sa \`/facts\``,
+        content: `puno na ang notes mo dito (${MAX_FACTS_PER_SCOPE} max) — burahin mo muna 'yung iba sa \`/facts\``,
         flags: MessageFlags.Ephemeral,
       });
       return;

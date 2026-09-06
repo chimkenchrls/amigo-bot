@@ -88,10 +88,14 @@ process.on("uncaughtException", (err) => {
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     logger.info("shutting down", { sig });
-    void client.destroy().finally(() => {
-      db.close();
-      process.exit(0);
-    });
+    void registry
+      .abortAll("nagre-restart si AmIgo — sorry, tapos na 'to")
+      .catch(() => {})
+      .finally(() => client.destroy())
+      .finally(() => {
+        db.close();
+        process.exit(0);
+      });
   });
 }
 

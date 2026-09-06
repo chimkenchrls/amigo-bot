@@ -28,7 +28,7 @@ describe("resolveNight", () => {
       "center-0": "werewolf", "center-1": "seer", "center-2": "robber",
     };
     const r2 = resolveNight(loneWolf, [{ kind: "noop", playerId: "p1" }]);
-    expect(linesFor(r2.results, "p1").join(" ").toLowerCase()).toMatch(/alone|mag-isa/);
+    expect(linesFor(r2.results, "p1").join(" ").toLowerCase()).toMatch(/lone|alone|only/);
   });
 
   it("minion sees the werewolves; masons see each other", () => {
@@ -48,7 +48,7 @@ describe("resolveNight", () => {
       "center-0": "robber", "center-1": "troublemaker", "center-2": "villager",
     };
     const r = resolveNight(start, [{ kind: "seer-player", playerId: "p1", target: "p2" }]);
-    expect(linesFor(r.results, "p1").join(" ")).toContain("werewolf");
+    expect(linesFor(r.results, "p1").join(" ")).toContain("Aswang");
     expect(r.currentRoles).toEqual(start);
   });
 
@@ -59,8 +59,8 @@ describe("resolveNight", () => {
     };
     const r = resolveNight(start, [{ kind: "seer-center", playerId: "p1", centers: [0, 1] }]);
     const line = linesFor(r.results, "p1").join(" ");
-    expect(line).toContain("werewolf");
-    expect(line).toContain("tanner");
+    expect(line).toContain("Aswang");
+    expect(line).toContain("Martir");
   });
 
   it("robber swaps with the target and is told the acquired role", () => {
@@ -71,7 +71,7 @@ describe("resolveNight", () => {
     const r = resolveNight(start, [{ kind: "robber", playerId: "p1", target: "p2" }]);
     expect(r.currentRoles.p1).toBe("werewolf");
     expect(r.currentRoles.p2).toBe("robber");
-    expect(linesFor(r.results, "p1").join(" ")).toContain("werewolf");
+    expect(linesFor(r.results, "p1").join(" ")).toContain("Aswang");
   });
 
   it("troublemaker swaps two other players without being told anything", () => {
@@ -95,8 +95,8 @@ describe("resolveNight", () => {
       { kind: "troublemaker", playerId: "p3", a: "p1", b: "p2" } as const,
     ];
     const r = resolveNight(start, actions);
-    // robber woke at wakeIndex 5 and saw "werewolf"
-    expect(linesFor(r.results, "p1").join(" ")).toContain("werewolf");
+    // robber woke at wakeIndex 5 and saw the werewolf card
+    expect(linesFor(r.results, "p1").join(" ")).toContain("Aswang");
     // troublemaker (index 6) then swapped p1 <-> p2
     expect(r.currentRoles.p1).toBe("robber");
     expect(r.currentRoles.p2).toBe("werewolf");
@@ -109,6 +109,6 @@ describe("resolveNight", () => {
     };
     const r = resolveNight(start, [{ kind: "robber", playerId: "p2", target: "p1" }]);
     expect(r.currentRoles.p1).toBe("robber");
-    expect(linesFor(r.results, "p1").join(" ")).toContain("robber");
+    expect(linesFor(r.results, "p1").join(" ")).toContain("Magnanakaw");
   });
 });

@@ -40,7 +40,7 @@ import {
   VOTE_MS,
 } from "./constants.js";
 
-const OVER_TIME_REASON = "masyadong tumagal ang laro";
+const OVER_TIME_REASON = "the game ran too long";
 
 const MS_PER_MINUTE = 60_000;
 
@@ -135,7 +135,7 @@ export class GameSession implements GameSessionHandle {
 
   private async init(): Promise<void> {
     this.lobbyMsg = await this.deps.channel.send(renderLobby(this.lobby, this.names));
-    this.arm(LOBBY_TIMEOUT_MS, () => void this.abort("naubusan ng oras ang lobby"));
+    this.arm(LOBBY_TIMEOUT_MS, () => void this.abort("nobody started — the lobby timed out"));
     this.maxGameTimer = this.deps.setTimer(MAX_GAME_MS, () =>
       void this.abort(OVER_TIME_REASON),
     );
@@ -153,14 +153,14 @@ export class GameSession implements GameSessionHandle {
   }
 
   async join(id: string, name: string): Promise<void> {
-    if (this.phase !== "lobby") throw new Error("hindi na pwedeng sumali — nagsimula na");
+    if (this.phase !== "lobby") throw new Error("can't join — the game already started");
     this.lobby = addPlayer(this.lobby, id);
     this.names[id] = name;
     await this.lobbyMsg.edit(renderLobby(this.lobby, this.names));
   }
 
   async leave(id: string): Promise<void> {
-    if (this.phase !== "lobby") throw new Error("hindi na pwedeng umalis — nagsimula na");
+    if (this.phase !== "lobby") throw new Error("can't leave — the game already started");
     this.lobby = removePlayer(this.lobby, id);
     if (id === this.lobby.hostId && this.lobby.players.length > 0) {
       this.lobby = { ...this.lobby, hostId: this.lobby.players[0]! };
@@ -169,9 +169,9 @@ export class GameSession implements GameSessionHandle {
   }
 
   async start(by: string): Promise<void> {
-    if (this.phase !== "lobby") throw new Error("nagsimula na ang laro");
-    if (by !== this.lobby.hostId) throw new Error("host lang ang pwedeng magsimula");
-    if (!canStart(this.lobby)) throw new Error("kulang pa ang manlalaro");
+    if (this.phase !== "lobby") throw new Error("the game already started");
+    if (by !== this.lobby.hostId) throw new Error("only the host can start");
+    if (!canStart(this.lobby)) throw new Error("not enough players yet");
 
     const roleSet = pickRoleSet(this.lobby.players.length);
     const { startingRoles } = deal(this.lobby.players, roleSet, this.deps.rng);
@@ -395,7 +395,7 @@ export class GameSession implements GameSessionHandle {
       this.maxGameTimer = undefined;
     }
     try {
-      await this.deps.channel.send({ content: `Natigil ang laro: ${reason}.` });
+      await this.deps.channel.send({ content: `Game stopped: ${reason}.` });
     } catch {
       /* best effort */
     }
@@ -404,10 +404,10 @@ export class GameSession implements GameSessionHandle {
 
   showRole(id: string): MessagePayload {
     if (this.phase === "lobby" || this.state === undefined) {
-      return { content: "Wala pang role — hindi pa nagsisimula." };
+      return { content: "No role yet — the game hasn't started." };
     }
     if (!this.state.players.includes(id)) {
-      return { content: "Hindi ka kasali sa laro." };
+      return { content: "You're not in this game." };
     }
     return renderRoleEphemeral(
       playerView(id, this.state, this.phase, this.nightResults),
@@ -416,7 +416,7 @@ export class GameSession implements GameSessionHandle {
 
   actPrompt(playerId: string): MessagePayload {
     if (this.state === undefined || !this.state.players.includes(playerId)) {
-      return { content: "Hindi ka kasali sa laro." };
+      return { content: "You're not in this game." };
     }
     const role = this.state.startingRoles[playerId]!;
     const others = this.state.players.filter((p) => p !== playerId);
@@ -428,7 +428,7 @@ export class GameSession implements GameSessionHandle {
       await this.abort(OVER_TIME_REASON);
       return;
     }
-    if (by !== this.hostId) throw new Error("host lang ang pwedeng mag-skip");
+    if (by !== this.hostId) throw new Error("only the host can skip");
     switch (this.phase) {
       case "night":
         await this.endNight();
@@ -440,7 +440,7 @@ export class GameSession implements GameSessionHandle {
         await this.endVote();
         return;
       default:
-        throw new Error("wala namang pwedeng i-skip ngayon");
+        throw new Error("nothing to skip right now");
     }
   }
 
@@ -450,17 +450,17 @@ export class GameSession implements GameSessionHandle {
       return;
     }
     if (this.phase !== "night" || this.state === undefined) {
-      throw new Error("hindi pwede 'yan ngayon");
+      throw new Error("you can't do that right now");
     }
     const state = this.state;
     if (!state.players.includes(playerId)) {
-      throw new Error("wala ka sa laro");
+      throw new Error("you're not in this game");
     }
     if (action.playerId !== playerId) {
-      throw new Error("hindi tugma ang aksyon sa manlalaro");
+      throw new Error("that action doesn't match your role");
     }
     if (state.nightActions.some((a) => a.playerId === playerId)) {
-      throw new Error("umaksyon ka na kagabi");
+      throw new Error("you already acted tonight");
     }
     const role = state.startingRoles[playerId]!;
     if (!ACTION_KINDS[role].includes(action.kind)) {
@@ -468,7 +468,7 @@ export class GameSession implements GameSessionHandle {
     }
     if (action.kind === "seer-player" || action.kind === "robber") {
       if (!state.players.includes(action.target)) {
-        throw new Error("wala sa laro ang target mo");
+        throw new Error("your target isn't in this game");
       }
     } else if (action.kind === "troublemaker") {
       if (
@@ -480,7 +480,7 @@ export class GameSession implements GameSessionHandle {
       }
     } else if (action.kind === "seer-center") {
       if (!action.centers.every((c) => c === 0 || c === 1 || c === 2)) {
-        throw new Error("wala sa gitna ang pinili mo");
+        throw new Error("that's not a valid center card");
       }
     }
     state.nightActions.push(action);
@@ -493,12 +493,12 @@ export class GameSession implements GameSessionHandle {
       return;
     }
     if (this.phase !== "vote" || this.state === undefined) {
-      throw new Error("hindi pwede 'yan ngayon");
+      throw new Error("you can't do that right now");
     }
     const state = this.state;
-    if (!state.players.includes(playerId)) throw new Error("wala ka sa laro");
-    if (!state.players.includes(target)) throw new Error("wala sa laro ang binoto mo");
-    if (playerId === target) throw new Error("bawal iboto ang sarili mo");
+    if (!state.players.includes(playerId)) throw new Error("you're not in this game");
+    if (!state.players.includes(target)) throw new Error("the player you voted for isn't in this game");
+    if (playerId === target) throw new Error("you can't vote for yourself");
     state.votes[playerId] = target;
     if (Object.keys(state.votes).length === state.players.length) {
       await this.endVote();

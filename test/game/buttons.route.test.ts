@@ -23,7 +23,7 @@ describe("routeGameInteraction", () => {
   it("replies ephemerally when there is no game in the channel", async () => {
     const i = iact();
     await routeGameInteraction(i as any, createRegistry(), logger as any);
-    expect(i.reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("laro") }));
+    expect(i.reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("No game") }));
   });
   it("routes join to the channel's session", async () => {
     const r = createRegistry();
@@ -96,7 +96,7 @@ describe("routeGameInteraction", () => {
     await routeGameInteraction(i as any, r, logger as any);
     expect(act).not.toHaveBeenCalled();
     expect(i.deferUpdate).toHaveBeenCalled();
-    expect(i.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("napili") }));
+    expect(i.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("pick") }));
   });
   it("blocks cancel from a non-host", async () => {
     const r = createRegistry();
@@ -106,6 +106,6 @@ describe("routeGameInteraction", () => {
     await routeGameInteraction(i as any, r, logger as any);
     expect(abort).not.toHaveBeenCalled();
     expect(i.deferUpdate).toHaveBeenCalled();
-    expect(i.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("Host") }));
+    expect(i.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("host") }));
   });
 });

@@ -89,7 +89,7 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     logger.info("shutting down", { sig });
     void registry
-      .abortAll("nagre-restart si AmIgo — sorry, tapos na 'to")
+      .abortAll("AmIgo is restarting — game's over, sorry")
       .catch(() => {})
       .finally(() => client.destroy())
       .finally(() => {

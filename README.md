@@ -41,11 +41,12 @@ its messages) for group-chat banter with per-channel memory.
 - **Chat** — the bot replies when you `@mention` it or reply to one of its
   messages. The reply is streamed: it posts as soon as the first words land and
   edits itself in place as the rest arrives. 5s per-user cooldown.
-- **`/werewolf`** — AmIgo hosts One Night Ultimate Werewolf. Players join a lobby,
-  then AmIgo deals hidden roles and narrates the night / day / reveal in Taglish. All
-  private info — your role, what you saw at night, your vote — comes back as an
-  ephemeral reply to a button, so nothing leaks into the channel. One game per channel;
-  a bot restart abandons a game in progress. 60s per-user cooldown on starting one.
+- **`/werewolf`** — AmIgo hosts One Night Ultimate Werewolf (in English; the roles keep
+  Tagalog names — Aswang, Manghuhula, Magnanakaw, Pasaway…). Players join a lobby, then
+  AmIgo deals hidden roles and narrates the night / day / reveal. All private info — your
+  role, what you saw at night, your vote — comes back as an ephemeral reply to a button,
+  so nothing leaks into the channel. One game per channel; a bot restart abandons a game
+  in progress. 60s per-user cooldown on starting one.
 
 ## Data
 

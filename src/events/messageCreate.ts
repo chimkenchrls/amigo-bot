@@ -3,10 +3,12 @@ import { DISCORD_UNKNOWN_MESSAGE } from "../constants.js";
 import { evaluateTrigger } from "../chat/trigger.js";
 import { handleChat, type ChatContext, type ChatDeps } from "../chat/handler.js";
 import type { BotMessageCache } from "../lib/botMessages.js";
+import type { GameRegistry } from "../game/registry.js";
 
 export type MessageDeps = ChatDeps & {
   botMessages: BotMessageCache;
   getBotUserId: () => string;
+  registry: GameRegistry;
 };
 
 export async function isReplyToBot(
@@ -37,6 +39,9 @@ export function onMessageCreate(
     // and system messages can never trigger a reply, and a message that already
     // @mentions the bot doesn't need the reply-chain check at all.
     if (message.author.bot || message.system) return;
+
+    if (deps.registry.has(message.channelId)) return;
+
     const mentionsBot = message.mentions.users.has(botId);
     const replyToBot = mentionsBot
       ? false

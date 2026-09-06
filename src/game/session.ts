@@ -1,6 +1,7 @@
 import type { GameSessionHandle } from "./registry.js";
 import type { MessagePayload } from "./render.js";
 import {
+  renderActEphemeral,
   renderDay,
   renderLobby,
   renderNight,
@@ -346,6 +347,10 @@ export class GameSession implements GameSessionHandle {
     if (this.phase === "reveal") {
       this.phase = "done";
       this.deps.onEnd(this.channelId);
+      if (this.maxGameTimer !== undefined) {
+        this.deps.clearTimer(this.maxGameTimer);
+        this.maxGameTimer = undefined;
+      }
     }
   }
 
@@ -403,6 +408,15 @@ export class GameSession implements GameSessionHandle {
     return renderRoleEphemeral(
       playerView(id, this.state, this.phase, this.nightResults),
     );
+  }
+
+  actPrompt(playerId: string): MessagePayload {
+    if (this.state === undefined || !this.state.players.includes(playerId)) {
+      return { content: "Hindi ka kasali sa laro." };
+    }
+    const role = this.state.startingRoles[playerId]!;
+    const others = this.state.players.filter((p) => p !== playerId);
+    return renderActEphemeral(role, this.names, others);
   }
 
   async skip(by: string): Promise<void> {

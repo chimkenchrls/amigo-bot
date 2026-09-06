@@ -1,3 +1,8 @@
+import { MessageFlags } from "discord.js";
+import type { GameRegistry } from "./registry.js";
+import type { GameSession } from "./session.js";
+import type { Logger } from "../lib/log.js";
+
 export type GameAction =
   | { verb: "join" }
   | { verb: "leave" }
@@ -44,5 +49,175 @@ export function decodeId(customId: string): GameAction | null {
     case "tm": return { verb: "tm" };
     case "vote": return { verb: "vote" };
     default: return null;
+  }
+}
+
+/** The center-card pair a seer peeks — the game always reveals the first two. */
+const SEER_CENTERS: [number, number] = [0, 1];
+
+const MSG = {
+  noGame: "Walang laro dito. Mag-/werewolf muna.",
+  noPick: "Wala kang napili.",
+  notHost: "Host lang ang pwedeng magkansela.",
+  generic: "may mali",
+} as const;
+
+const CANCEL_REASON = "kinansela ng host";
+
+/** A Discord component interaction, decoded to just what the router needs. */
+export interface GameInteraction {
+  customId: string;
+  channelId: string;
+  userId: string;
+  displayName: string;
+  values?: string[];
+  reply(p: unknown): Promise<void>;
+  deferUpdate(): Promise<void>;
+  followUp(p: unknown): Promise<void>;
+}
+
+/** The chosen select-menu values, or null if fewer than `n` were picked. */
+function selected(i: GameInteraction, n: number): string[] | null {
+  const v = i.values ?? [];
+  return v.length >= n ? v : null;
+}
+
+const ephemeral = (content: string): { content: string; flags: number } => ({
+  content,
+  flags: MessageFlags.Ephemeral,
+});
+
+/**
+ * Route a decoded component interaction to its `GameSession` method. Guard
+ * failures thrown by the session surface to the user as an ephemeral message;
+ * a foreign or malformed customId is silently ignored.
+ */
+export async function routeGameInteraction(
+  i: GameInteraction,
+  registry: GameRegistry,
+  logger: Logger,
+): Promise<void> {
+  const action = decodeId(i.customId);
+  if (!action) return;
+
+  const session = registry.get(i.channelId) as GameSession | undefined;
+  if (!session) {
+    await i.reply(ephemeral(MSG.noGame));
+    return;
+  }
+
+  try {
+    await dispatch(action, i, session);
+  } catch (err) {
+    logger.debug("game interaction failed", {
+      verb: action.verb,
+      name: err instanceof Error ? err.name : "unknown",
+    });
+    await i
+      .reply(ephemeral(err instanceof Error ? err.message : MSG.generic))
+      .catch(() => {});
+  }
+}
+
+async function dispatch(
+  action: GameAction,
+  i: GameInteraction,
+  session: GameSession,
+): Promise<void> {
+  switch (action.verb) {
+    case "join":
+      await session.join(i.userId, i.displayName);
+      await i.deferUpdate();
+      return;
+    case "leave":
+      await session.leave(i.userId);
+      await i.deferUpdate();
+      return;
+    case "start":
+      await session.start(i.userId);
+      await i.deferUpdate();
+      return;
+    case "skip":
+      await session.skip(i.userId);
+      await i.deferUpdate();
+      return;
+    case "cancel":
+      if (i.userId !== session.hostId) {
+        await i.reply(ephemeral(MSG.notHost));
+        return;
+      }
+      await session.abort(CANCEL_REASON);
+      await i.deferUpdate();
+      return;
+    case "role":
+      await i.reply({ ...session.showRole(i.userId), flags: MessageFlags.Ephemeral });
+      return;
+    case "act": {
+      const p = session.actPrompt(i.userId);
+      await i.reply("flags" in p ? p : { ...p, flags: MessageFlags.Ephemeral });
+      return;
+    }
+    case "seer": {
+      if (action.mode === "center") {
+        await session.act(i.userId, {
+          kind: "seer-center",
+          playerId: i.userId,
+          centers: SEER_CENTERS,
+        });
+        await i.deferUpdate();
+        return;
+      }
+      const t = selected(i, 1);
+      if (!t) {
+        await i.reply(ephemeral(MSG.noPick));
+        return;
+      }
+      await session.act(i.userId, {
+        kind: "seer-player",
+        playerId: i.userId,
+        target: t[0]!,
+      });
+      await i.deferUpdate();
+      return;
+    }
+    case "rob": {
+      const t = selected(i, 1);
+      if (!t) {
+        await i.reply(ephemeral(MSG.noPick));
+        return;
+      }
+      await session.act(i.userId, {
+        kind: "robber",
+        playerId: i.userId,
+        target: t[0]!,
+      });
+      await i.deferUpdate();
+      return;
+    }
+    case "tm": {
+      const t = selected(i, 2);
+      if (!t) {
+        await i.reply(ephemeral(MSG.noPick));
+        return;
+      }
+      await session.act(i.userId, {
+        kind: "troublemaker",
+        playerId: i.userId,
+        a: t[0]!,
+        b: t[1]!,
+      });
+      await i.deferUpdate();
+      return;
+    }
+    case "vote": {
+      const t = selected(i, 1);
+      if (!t) {
+        await i.reply(ephemeral(MSG.noPick));
+        return;
+      }
+      await session.vote(i.userId, t[0]!);
+      await i.deferUpdate();
+      return;
+    }
   }
 }

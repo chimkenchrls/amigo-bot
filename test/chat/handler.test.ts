@@ -46,6 +46,7 @@ function deps(over: Partial<Parameters<typeof handleChat>[0]> = {}) {
     botMessages: { remember: vi.fn(), has: vi.fn(() => false) },
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     model: "m",
+    studyMode: { has: vi.fn(() => false), toggle: vi.fn(() => true), off: vi.fn() },
     ...over,
   };
 }
@@ -195,6 +196,24 @@ describe("handleChat", () => {
     expect(c.edit).toHaveBeenLastCalledWith("kalahati");
     expect(d.store.append).toHaveBeenNthCalledWith(2, "c", "model", "kalahati");
     expect(d.logger.warn).toHaveBeenCalled();
+  });
+
+  it("passes studyMode: true to the stream when the channel is in study mode", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
+    const d = deps();
+    (d.studyMode.has as any).mockReturnValue(true);
+    const c = ctx();
+    await handleChat(d)(c);
+    expect(d.studyMode.has).toHaveBeenCalledWith("c");
+    expect((generateReplyStream as any).mock.calls[0][1].studyMode).toBe(true);
+  });
+
+  it("passes studyMode: false when the channel is not in study mode", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
+    const d = deps();
+    const c = ctx();
+    await handleChat(d)(c);
+    expect((generateReplyStream as any).mock.calls[0][1].studyMode).toBe(false);
   });
 
   it("clamps oversized inbound text before the AI call and before persisting", async () => {

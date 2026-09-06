@@ -41,6 +41,11 @@ its messages) for group-chat banter with per-channel memory.
 - **Chat** — the bot replies when you `@mention` it or reply to one of its
   messages. The reply is streamed: it posts as soon as the first words land and
   edits itself in place as the rest arrives. 5s per-user cooldown.
+- **`/study`** — toggles study mode for the channel. While on, `@mention` chat uses a
+  focused-tutor persona instead of the group-chat one: it explains a concept with a
+  worked example and a checking question, and on "quiz me" it drills you on whatever's
+  in the recent conversation (paste your notes first). `/study` again to switch back.
+  In-memory toggle, cleared on restart.
 - **`/werewolf`** — AmIgo hosts One Night Ultimate Werewolf (in English; the roles keep
   Tagalog names — Aswang, Manghuhula, Magnanakaw, Pasaway…). Players join a lobby, then
   AmIgo deals hidden roles and narrates the night / day / reveal. All private info — your

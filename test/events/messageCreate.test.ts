@@ -17,6 +17,7 @@ function baseDeps() {
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     model: "m",
     getBotUserId: () => "BOT",
+    studyMode: { has: vi.fn(() => false), toggle: vi.fn(() => true), off: vi.fn() },
     registry: {
       has: vi.fn(() => false),
       get: vi.fn(() => undefined),

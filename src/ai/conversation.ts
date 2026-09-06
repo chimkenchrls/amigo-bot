@@ -1,6 +1,6 @@
 import type { GoogleGenAI } from "@google/genai";
 import { AI_TIMEOUT_MS, CHAT_THINKING_LEVEL } from "../constants.js";
-import { CHAT_PERSONA } from "./persona.js";
+import { CHAT_PERSONA, STUDY_PERSONA } from "./persona.js";
 import { SAFETY_SETTINGS } from "./safety.js";
 import {
   AiClientError,
@@ -29,6 +29,8 @@ export interface ReplyParams {
   history: HistoryTurn[];
   userTurn: string;
   model: string;
+  /** When true, AmIgo replies as a focused tutor instead of the group-chat persona. */
+  studyMode?: boolean;
 }
 
 export type ChatResult =
@@ -42,7 +44,7 @@ function newChat(genai: GoogleGenAI, params: ReplyParams) {
     model: params.model,
     history: params.history,
     config: {
-      systemInstruction: CHAT_PERSONA,
+      systemInstruction: params.studyMode ? STUDY_PERSONA : CHAT_PERSONA,
       safetySettings: SAFETY_SETTINGS,
       temperature: 0.9,
       thinkingConfig: { thinkingLevel: CHAT_THINKING_LEVEL },

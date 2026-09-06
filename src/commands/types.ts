@@ -3,6 +3,7 @@ import type { GoogleGenAI } from "@google/genai";
 import type { Cooldown } from "../lib/cooldown.js";
 import type { Logger } from "../lib/log.js";
 import type { GameRegistry } from "../game/registry.js";
+import type { StudyMode } from "../lib/studyMode.js";
 
 export interface CommandCtx {
   cooldown: Cooldown;
@@ -10,6 +11,7 @@ export interface CommandCtx {
   logger: Logger;
   model: string;
   registry: GameRegistry;
+  studyMode: StudyMode;
   rng?: () => number;
 }
 

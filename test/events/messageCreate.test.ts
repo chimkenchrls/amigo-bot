@@ -66,6 +66,22 @@ describe("onMessageCreate", () => {
     expect(inner).not.toHaveBeenCalled();
   });
 
+  it("invokes the chat handler when the message just says the name, no @mention", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const fetch = vi.fn();
+    const m = msg({
+      content: "amigo you around?",
+      mentions: { users: new Map() },
+      reference: { messageId: "ref1" },
+      channel: { sendTyping: vi.fn(async () => {}), messages: { fetch } },
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(inner).toHaveBeenCalledOnce();
+    expect(inner.mock.calls[0]![0].text).toBe("amigo you around?");
+    expect(fetch).not.toHaveBeenCalled(); // name trigger skips the reply-chain fetch
+  });
+
   it("ignores bot authors", async () => {
     const inner = vi.fn(async (_ctx: ChatContext) => {});
     (handleChat as any).mockReturnValue(inner);

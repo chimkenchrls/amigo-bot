@@ -38,9 +38,10 @@ its messages) for group-chat banter with per-channel memory.
 - **`/roast <image>`** — flips a coin per call: either a savage roast or unhinged
   hype of whatever it sees. Accepts PNG / JPEG / WebP / GIF up to 4 MB. 30s
   per-user cooldown.
-- **Chat** — the bot replies when you `@mention` it or reply to one of its
-  messages. The reply is streamed: it posts as soon as the first words land and
-  edits itself in place as the rest arrives. 5s per-user cooldown.
+- **Chat** — the bot replies when you `@mention` it, reply to one of its messages,
+  or just say **"amigo"** in your message (whole word, any case). The reply is
+  streamed: it posts as soon as the first words land and edits itself in place as
+  the rest arrives. 5s per-user cooldown.
 - **`/study`** — toggles study mode for the channel. While on, `@mention` chat uses a
   focused-tutor persona instead of the group-chat one: it explains a concept with a
   worked example and a checking question, and on "quiz me" it drills you on whatever's

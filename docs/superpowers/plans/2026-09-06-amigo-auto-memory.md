@@ -1085,26 +1085,24 @@ In `test/events/messageCreate.test.ts`, add `autoMemory` to `baseDeps()` (near t
     autoMemory: { note: vi.fn(), start: vi.fn(), stop: vi.fn(), tick: vi.fn(async () => {}) },
 ```
 
-Then add a test in the same file:
+Then add tests in the same file. The file's helpers are `baseDeps()` and `msg(over)`; `baseDeps()` already has `registry.has: vi.fn(() => false)`, and `msg()` builds `author: { bot: false, id: "u1" }` and `channelId: "c"`.
 
 ```ts
   it("records channel activity for a human message even when a game is running", async () => {
     const deps = baseDeps();
     (deps.registry.has as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    const m = msg({ content: "just chatting", authorBot: false });
+    const m = msg({ content: "just chatting" });
     await onMessageCreate(deps as never)(m as never);
-    expect(deps.autoMemory.note).toHaveBeenCalledWith(m.channelId);
+    expect(deps.autoMemory.note).toHaveBeenCalledWith("c");
   });
 
   it("does not record activity for a bot message", async () => {
     const deps = baseDeps();
-    const m = msg({ content: "beep", authorBot: true });
+    const m = msg({ author: { bot: true, id: "u1" } });
     await onMessageCreate(deps as never)(m as never);
     expect(deps.autoMemory.note).not.toHaveBeenCalled();
   });
 ```
-
-(Match `msg(...)` / `baseDeps()` to the helpers already in that file — adjust the helper names and the message-shape keys to whatever the file uses. If the file has no `registry.has` mock in `baseDeps`, add `registry: { has: vi.fn(() => false), ... }` consistent with the existing fixture.)
 
 - [ ] **Step 2: Run to verify it fails**
 

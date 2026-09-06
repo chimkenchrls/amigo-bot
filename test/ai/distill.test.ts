@@ -1,7 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { createDistiller } from "../../src/ai/distill.js";
-import { RateLimitError, AiClientError } from "../../src/ai/errors.js";
-import { MAX_AUTO_FACTS, MAX_FACT_CHARS } from "../../src/constants.js";
+import {
+  RateLimitError,
+  AiClientError,
+  AiUnavailableError,
+} from "../../src/ai/errors.js";
+import {
+  AI_TIMEOUT_MS,
+  MAX_AUTO_FACTS,
+  MAX_FACT_CHARS,
+} from "../../src/constants.js";
 
 function fakeGenAI(impl: () => unknown) {
   return { models: { generateContent: vi.fn(impl) } } as never;
@@ -32,6 +40,16 @@ describe("createDistiller", () => {
     });
   });
 
+  it("treats a marker-prefixed NONE as an explicit clear", async () => {
+    for (const text of ["- NONE", "1. NONE", "* none"]) {
+      const d = createDistiller(fakeGenAI(() => ({ text })), "m");
+      expect(await d.distill({ existing: ["old"], transcript: "…" })).toEqual({
+        ok: true,
+        notes: [],
+      });
+    }
+  });
+
   it("returns { ok: false } when the model yields no text", async () => {
     const d = createDistiller(fakeGenAI(() => ({ text: "" })), "m");
     expect(await d.distill({ existing: ["keep me"], transcript: "…" })).toEqual({
@@ -59,14 +77,37 @@ describe("createDistiller", () => {
     const d = createDistiller(genai, "m");
     await d.distill({ existing: ["prior note"], transcript: "Dana: hello" });
     const req = (genai as never as { models: { generateContent: { mock: { calls: unknown[][] } } } }).models.generateContent.mock.calls[0]![0] as {
-      config: { systemInstruction: string; safetySettings: unknown; thinkingConfig: { thinkingLevel: unknown } };
+      config: {
+        systemInstruction: string;
+        safetySettings: unknown;
+        thinkingConfig: { thinkingLevel: unknown };
+        temperature: number;
+        maxOutputTokens: number;
+        httpOptions: { timeout: number };
+      };
       contents: { parts: { text: string }[] }[];
     };
     expect(req.config.safetySettings).toBeDefined();
     expect(req.config.thinkingConfig.thinkingLevel).toBeDefined();
+    expect(req.config.temperature).toBe(0.4);
+    expect(req.config.maxOutputTokens).toBe(500);
+    expect(req.config.httpOptions.timeout).toBe(AI_TIMEOUT_MS);
     const prompt = req.contents[0]!.parts[0]!.text;
     expect(prompt).toContain("prior note");
     expect(prompt).toContain("Dana: hello");
+  });
+
+  it("retries once on 503 then throws AiUnavailableError", async () => {
+    const genai = fakeGenAI(() => {
+      throw { status: 503 };
+    });
+    await expect(
+      createDistiller(genai, "m").distill({ existing: [], transcript: "" }),
+    ).rejects.toBeInstanceOf(AiUnavailableError);
+    expect(
+      (genai as never as { models: { generateContent: { mock: { calls: unknown[][] } } } }).models
+        .generateContent.mock.calls.length,
+    ).toBe(2);
   });
 
   it("throws RateLimitError on 429 and AiClientError on 404", async () => {

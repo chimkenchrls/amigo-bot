@@ -56,7 +56,7 @@ export const factsCommand: Command = {
       const n = ctx.facts.count(scope, scopeId, "auto");
       if (n === 0) {
         await interaction.reply({
-          content: "wala naman akong sariling notes dito na bubura-hin",
+          content: "wala naman akong sariling napulot dito na buburahin",
           flags: EPH,
         });
         return;
@@ -64,7 +64,9 @@ export const factsCommand: Command = {
       ctx.facts.replaceAuto(scope, scopeId, []);
       ctx.logger.info("auto facts wiped", { scope, scopeId, n });
       await interaction.reply({
-        content: `okay, kinalimutan ko na 'yung ${n} note na napulot ko sarili`,
+        content:
+          `okay, binura ko 'yung ${n} auto-note dito. pero baka mapulot ko ulit ` +
+          "habang nag-uusap kayo — gamitin ang `/forget` kung gusto mong burahin din ang usapan.",
         flags: EPH,
       });
       return;
@@ -89,7 +91,7 @@ export const factsCommand: Command = {
     await interaction.reply({
       content:
         `**${serverWide ? "Server-wide notes" : "Notes for this channel"}:**\n${body}\n\n` +
-        "burahin ang isa: `/facts forget:<number>`",
+        "burahin ang isa: `/facts forget:<number>` — o `/facts wipe:true` para sa mga `·picked up`",
       flags: EPH,
     });
   },

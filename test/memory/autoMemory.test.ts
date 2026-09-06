@@ -62,11 +62,53 @@ describe("createAutoMemory", () => {
     });
     await createAutoMemory(d as never).tick();
     await flush();
-    expect(d.logger.warn).toHaveBeenCalledWith(
-      "auto-memory distill failed",
-      expect.objectContaining({ channelId: "c1" }),
-    );
+    expect(d.logger.warn).toHaveBeenCalledWith("auto-memory distill failed", {
+      channelId: "c1",
+      name: "Error",
+    });
     expect(d.facts.replaceAuto).not.toHaveBeenCalled();
+  });
+
+  it("skips a re-distill when the transcript is unchanged since the last pass", async () => {
+    const d = makeDeps();
+    const am = createAutoMemory(d as never);
+    await am.tick();
+    await flush();
+    await am.tick();
+    await flush();
+    expect(d.distiller.distill).toHaveBeenCalledTimes(1);
+  });
+
+  it("distils again once new messages have landed since the last pass", async () => {
+    const d = makeDeps();
+    const am = createAutoMemory(d as never);
+    await am.tick();
+    await flush();
+    (d.store.recent as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 1, channelId: "c1", role: "user", content: "Dana: hi", createdAt: 0 },
+      { id: 2, channelId: "c1", role: "model", content: "yo", createdAt: 0 },
+      { id: 5, channelId: "c1", role: "user", content: "Dana: back", createdAt: 0 },
+    ]);
+    await am.tick();
+    await flush();
+    expect(d.distiller.distill).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases the in-flight lock on the empty-transcript path", async () => {
+    const d = makeDeps({
+      store: { recent: vi.fn(() => []), append: vi.fn(), trim: vi.fn(), purgeChannel: vi.fn() },
+    });
+    const am = createAutoMemory(d as never);
+    await am.tick();
+    await flush();
+    expect(d.distiller.distill).not.toHaveBeenCalled();
+    (d.store.recent as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 1, channelId: "c1", role: "user", content: "Dana: hi", createdAt: 0 },
+      { id: 2, channelId: "c1", role: "model", content: "yo", createdAt: 0 },
+    ]);
+    await am.tick();
+    await flush();
+    expect(d.distiller.distill).toHaveBeenCalledTimes(1);
   });
 
   it("marks the channel distilled synchronously, before the async work finishes", async () => {
@@ -76,6 +118,7 @@ describe("createAutoMemory", () => {
     });
     await createAutoMemory(d as never).tick();
     expect(d.activity.markDistilled).toHaveBeenCalledWith("c1");
+    expect(d.activity.markDistilled).toHaveBeenCalledTimes(1);
     expect(d.facts.replaceAuto).not.toHaveBeenCalled();
     release({ ok: true, notes: [] });
     await flush();

@@ -50,6 +50,8 @@ function parseNotes(raw: string): string[] {
     out.push(cleaned.slice(0, MAX_FACT_CHARS));
     if (out.length >= MAX_AUTO_FACTS) break;
   }
+  // a lone "NONE" survives marker-stripping (e.g. "- NONE", "1. NONE") — treat as clear
+  if (out.length === 1 && /^none$/i.test(out[0]!)) return [];
   return out;
 }
 

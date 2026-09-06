@@ -18,6 +18,7 @@ function baseDeps() {
     model: "m",
     getBotUserId: () => "BOT",
     studyMode: { has: vi.fn(() => false), toggle: vi.fn(() => true), off: vi.fn() },
+    facts: { forChat: vi.fn(() => ({ channel: [], guild: [] })), add: vi.fn(() => null), list: vi.fn(() => []), remove: vi.fn(() => false), count: vi.fn(() => 0) },
     registry: {
       has: vi.fn(() => false),
       get: vi.fn(() => undefined),

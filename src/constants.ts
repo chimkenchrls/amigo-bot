@@ -6,6 +6,9 @@ export const CHAT_COOLDOWN_MS = 5_000;
 export const NAME_TRIGGER_COOLDOWN_MS = 30_000;
 export const CHAT_HISTORY_LOAD = 16;
 export const CHAT_HISTORY_KEEP = 30;
+/** Max curated facts kept per scope (channel or guild); `/remember` refuses beyond this. */
+export const MAX_FACTS_PER_SCOPE = 40;
+export const MAX_FACT_CHARS = 300;
 export const MAX_CHAT_INPUT_CHARS = 1000;
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 export const AI_TIMEOUT_MS = 15_000;

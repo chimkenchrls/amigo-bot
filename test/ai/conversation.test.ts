@@ -77,6 +77,32 @@ describe("generateReply", () => {
     expect(sendArgs).toEqual({ message: "Dana: hello" });
   });
 
+  it("folds saved facts into the system prompt, server notes first", async () => {
+    const { genai, create } = fakeGenAI(() => ({ text: "ok" }));
+    await generateReply(genai, {
+      history: [],
+      userTurn: "Dana: hi",
+      model: "m",
+      facts: { channel: ["Eli hates cilantro"], guild: ["timezone is PHT"] },
+    });
+    const sys = (
+      (create.mock.calls[0] as unknown[])[0] as { config: { systemInstruction: string } }
+    ).config.systemInstruction;
+    expect(sys).toContain("Long-term notes");
+    expect(sys).toContain("(server) timezone is PHT");
+    expect(sys).toContain("- Eli hates cilantro");
+    expect(sys.indexOf("PHT")).toBeLessThan(sys.indexOf("cilantro"));
+  });
+
+  it("leaves the system prompt alone when there are no facts", async () => {
+    const { genai, create } = fakeGenAI(() => ({ text: "ok" }));
+    await generateReply(genai, { history: [], userTurn: "x", model: "m" });
+    const sys = (
+      (create.mock.calls[0] as unknown[])[0] as { config: { systemInstruction: string } }
+    ).config.systemInstruction;
+    expect(sys).not.toContain("Long-term notes");
+  });
+
   it("uses the study-buddy persona when studyMode is set", async () => {
     const { genai, create } = fakeGenAI(() => ({ text: "sure" }));
     await generateReply(genai, {

@@ -17,6 +17,20 @@ export const MIGRATIONS: ReadonlyArray<(db: DB) => void> = [
       CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
     `);
   },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS facts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope      TEXT    NOT NULL CHECK (scope IN ('channel','guild')),
+        scope_id   TEXT    NOT NULL,
+        content    TEXT    NOT NULL,
+        created_by TEXT    NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_facts_scope
+        ON facts (scope, scope_id, id);
+    `);
+  },
 ];
 
 export function openDatabase(dbPath: string): DB {

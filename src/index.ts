@@ -32,7 +32,7 @@ const studyMode = createStudyMode();
 const client = createClient();
 registerReady(client, logger);
 
-const commandCtx = { cooldown, genai, logger, model: config.model, registry, studyMode };
+const commandCtx = { cooldown, genai, logger, model: config.model, registry, studyMode, store };
 client.on(
   "interactionCreate",
   routeInteraction({ commands, ctx: commandCtx, logger, registry }),

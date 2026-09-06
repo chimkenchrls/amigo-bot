@@ -4,6 +4,7 @@ import type { Cooldown } from "../lib/cooldown.js";
 import type { Logger } from "../lib/log.js";
 import type { GameRegistry } from "../game/registry.js";
 import type { StudyMode } from "../lib/studyMode.js";
+import type { MessageStore } from "../store/messages.js";
 
 export interface CommandCtx {
   cooldown: Cooldown;
@@ -12,6 +13,7 @@ export interface CommandCtx {
   model: string;
   registry: GameRegistry;
   studyMode: StudyMode;
+  store: MessageStore;
   rng?: () => number;
 }
 

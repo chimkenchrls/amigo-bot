@@ -2,6 +2,8 @@ import { ThinkingLevel } from "@google/genai";
 
 export const ROAST_COOLDOWN_MS = 30_000;
 export const CHAT_COOLDOWN_MS = 5_000;
+/** Longer cooldown when only the word "amigo" triggered the reply (not a direct ping). */
+export const NAME_TRIGGER_COOLDOWN_MS = 30_000;
 export const CHAT_HISTORY_LOAD = 16;
 export const CHAT_HISTORY_KEEP = 30;
 export const MAX_CHAT_INPUT_CHARS = 1000;

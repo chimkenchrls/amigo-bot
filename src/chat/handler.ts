@@ -1,6 +1,7 @@
 import type { GoogleGenAI } from "@google/genai";
 import {
   CHAT_COOLDOWN_MS,
+  NAME_TRIGGER_COOLDOWN_MS,
   CHAT_HISTORY_KEEP,
   CHAT_HISTORY_LOAD,
   DISCORD_MSG_LIMIT,
@@ -42,6 +43,8 @@ export interface ChatContext {
   displayName: string;
   text: string;
   guildId: string | null;
+  /** True for an @mention or a reply-to-bot; false when only the name "amigo" triggered it. */
+  directPing: boolean;
   sendTyping(): Promise<void>;
   reply(content: string): Promise<SentMessage>;
   followUp(content: string): Promise<SentMessage>;
@@ -67,9 +70,13 @@ export function handleChat(deps: ChatDeps) {
     };
 
     try {
-      const cd = deps.cooldown.check(ctx.userId, "chat", CHAT_COOLDOWN_MS);
+      // A bare "amigo" in chatter gets a longer leash so the bot doesn't jump on
+      // every message; a direct @mention / reply stays snappy.
+      const cd = ctx.directPing
+        ? deps.cooldown.check(ctx.userId, "chat", CHAT_COOLDOWN_MS)
+        : deps.cooldown.check(ctx.userId, "chat-name", NAME_TRIGGER_COOLDOWN_MS);
       if (!cd.ok) {
-        await ctx.react("🥱").catch(() => {});
+        if (ctx.directPing) await ctx.react("🥱").catch(() => {});
         return;
       }
 

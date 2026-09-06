@@ -79,6 +79,7 @@ describe("onMessageCreate", () => {
     await onMessageCreate(baseDeps())(m as never);
     expect(inner).toHaveBeenCalledOnce();
     expect(inner.mock.calls[0]![0].text).toBe("amigo you around?");
+    expect(inner.mock.calls[0]![0].directPing).toBe(false);
     expect(fetch).not.toHaveBeenCalled(); // name trigger skips the reply-chain fetch
   });
 

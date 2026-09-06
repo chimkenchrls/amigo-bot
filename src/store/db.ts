@@ -31,6 +31,12 @@ export const MIGRATIONS: ReadonlyArray<(db: DB) => void> = [
         ON facts (scope, scope_id, id);
     `);
   },
+  (db) => {
+    db.exec(`
+      ALTER TABLE facts ADD COLUMN source TEXT NOT NULL DEFAULT 'user'
+        CHECK (source IN ('user','auto'));
+    `);
+  },
 ];
 
 export function openDatabase(dbPath: string): DB {

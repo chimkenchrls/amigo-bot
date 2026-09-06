@@ -25,8 +25,18 @@ describe("openDatabase", () => {
       name: string;
     }[];
     expect(factCols.map((c) => c.name).sort()).toEqual(
-      ["content", "created_at", "created_by", "id", "scope", "scope_id"].sort(),
+      ["content", "created_at", "created_by", "id", "scope", "scope_id", "source"].sort(),
     );
+  });
+
+  it("constrains facts.source to 'user' or 'auto'", () => {
+    const db = openDatabase(":memory:");
+    const insert = db.prepare(
+      "INSERT INTO facts (scope, scope_id, content, created_by, created_at, source) VALUES ('channel', 'c1', 'x', 'amigo', 0, ?)",
+    );
+    expect(() => insert.run("bogus")).toThrow();
+    expect(() => insert.run("auto")).not.toThrow();
+    expect(() => insert.run("user")).not.toThrow();
   });
 
   it("is idempotent when reopened on the same connection", () => {

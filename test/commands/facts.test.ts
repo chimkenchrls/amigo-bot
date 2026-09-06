@@ -1,11 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { factsCommand } from "../../src/commands/facts.js";
 
-const fact = (id: number, content: string) => ({
+const fact = (id: number, content: string, source: "user" | "auto" = "user") => ({
   id,
   scope: "channel" as const,
   scopeId: "c1",
   content,
+  source,
   createdBy: "u1",
   createdAt: 0,
 });
@@ -17,7 +18,8 @@ function ctx(list: ReturnType<typeof fact>[], over: Record<string, unknown> = {}
       remove: vi.fn(() => true),
       add: vi.fn(),
       forChat: vi.fn(),
-      count: vi.fn(),
+      count: vi.fn(() => 0),
+      replaceAuto: vi.fn(),
     },
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     ...over,
@@ -67,5 +69,54 @@ describe("/facts", () => {
     expect(i.reply).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.stringContaining("5") }),
     );
+  });
+
+  it("tags auto-picked-up notes in the listing", async () => {
+    const c = ctx([fact(3, "movie night is Fridays", "user"), fact(7, "Dana's taking the bar", "auto")]);
+    const i = interaction();
+    await factsCommand.execute(i as never, c as never);
+    const body = (i.reply as ReturnType<typeof vi.fn>).mock.calls[0]![0].content;
+    expect(body).toContain("1. movie night is Fridays");
+    expect(body).toContain("2. Dana's taking the bar  ·picked up");
+  });
+
+  it("wipe:true clears only the auto notes", async () => {
+    const c = ctx([fact(3, "user note", "user"), fact(7, "auto note", "auto")]);
+    (c.facts.count as ReturnType<typeof vi.fn>).mockReturnValue(1);
+    const i = interaction({ wipe: true });
+    await factsCommand.execute(i as never, c as never);
+    expect(c.facts.replaceAuto).toHaveBeenCalledWith("channel", "c1", []);
+    expect(c.facts.remove).not.toHaveBeenCalled();
+    const msg = (i.reply as ReturnType<typeof vi.fn>).mock.calls[0]![0].content;
+    expect(msg).toContain("binura ko");
+    expect(msg).toContain("mapulot ko ulit");
+    expect(msg).toContain("/forget");
+  });
+
+  it("wipe:true with no auto notes reports nothing to wipe", async () => {
+    const c = ctx([fact(3, "user note", "user")]);
+    (c.facts.count as ReturnType<typeof vi.fn>).mockReturnValue(0);
+    const i = interaction({ wipe: true });
+    await factsCommand.execute(i as never, c as never);
+    expect(c.facts.replaceAuto).not.toHaveBeenCalled();
+    const msg = (i.reply as ReturnType<typeof vi.fn>).mock.calls[0]![0].content;
+    expect(msg).toContain("buburahin");
+    expect(msg).not.toContain("bubura-hin");
+  });
+
+  it("the listing footer points at both forget and wipe", async () => {
+    const c = ctx([fact(3, "movie night", "user"), fact(7, "auto note", "auto")]);
+    const i = interaction();
+    await factsCommand.execute(i as never, c as never);
+    const body = (i.reply as ReturnType<typeof vi.fn>).mock.calls[0]![0].content;
+    expect(body).toContain("/facts forget:<number>");
+    expect(body).toContain("/facts wipe:true");
+  });
+
+  it("forget wins when combined with wipe", async () => {
+    const c = ctx([fact(3, "a", "user"), fact(7, "b", "auto")]);
+    await factsCommand.execute(interaction({ forget: 2, wipe: true }) as never, c as never);
+    expect(c.facts.remove).toHaveBeenCalledWith(7);
+    expect(c.facts.replaceAuto).not.toHaveBeenCalled();
   });
 });

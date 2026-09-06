@@ -8,9 +8,16 @@ import {
   renderRoleEphemeral,
   renderVote,
 } from "./render.js";
-import type { GameMaster } from "../ai/gameMaster.js";
+import type { GameMaster, Narration } from "../ai/gameMaster.js";
 import type { Logger } from "../lib/log.js";
-import type { GameState, NightAction, NightResult, Phase, RoleName } from "./types.js";
+import type {
+  GameState,
+  NightAction,
+  NightResult,
+  Outcome,
+  Phase,
+  RoleName,
+} from "./types.js";
 import type { Lobby } from "./lobby.js";
 import { addPlayer, canStart, emptyLobby, removePlayer } from "./lobby.js";
 import {
@@ -22,7 +29,14 @@ import {
   tallyVotes,
 } from "./engine.js";
 import { ROLES } from "./roles.js";
-import { DAY_MS, LOBBY_TIMEOUT_MS, NIGHT_MS, VOTE_MS } from "./constants.js";
+import {
+  DAY_MS,
+  LOBBY_TIMEOUT_MS,
+  NARRATION_TIMEOUT_MS,
+  NIGHT_MS,
+  REVEAL_NARRATION_TIMEOUT_MS,
+  VOTE_MS,
+} from "./constants.js";
 
 const MS_PER_MINUTE = 60_000;
 
@@ -162,6 +176,46 @@ export class GameSession implements GameSessionHandle {
     this.state!.nightActions = [];
     this.arm(NIGHT_MS, () => void this.endNight());
     this.nightMsg = await this.deps.channel.send(renderNight(null));
+    void this.narrateInto(
+      "night",
+      this.nightMsg,
+      () => this.deps.gameMaster.narrateNight({ playerNames: this.playerNames() }),
+      (t) => renderNight(t),
+      NARRATION_TIMEOUT_MS,
+    );
+  }
+
+  private playerNames(): string[] {
+    return (this.state?.players ?? []).map((id) => this.names[id] ?? id);
+  }
+
+  /** Edit `msg` in place with AmIgo's flavor once it arrives; never blocks the phase, never throws. */
+  private async narrateInto(
+    phase: Phase,
+    msg: SentMessage,
+    call: () => Promise<Narration>,
+    render: (text: string) => MessagePayload,
+    capMs: number,
+  ): Promise<void> {
+    let h: TimerHandle | undefined;
+    try {
+      const res = await Promise.race<Narration>([
+        call(),
+        new Promise<Narration>((resolve) => {
+          h = this.deps.setTimer(capMs, () => resolve({ ok: false }));
+        }),
+      ]);
+      if (res.ok && this.phase === phase) {
+        await msg.edit(render(res.text)).catch(() => {});
+      }
+    } catch (err) {
+      this.deps.logger.warn("game narration failed", {
+        phase,
+        name: err instanceof Error ? err.name : "unknown",
+      });
+    } finally {
+      if (h !== undefined) this.deps.clearTimer(h);
+    }
   }
 
   /** True once every player whose starting role acts has an action recorded. */
@@ -197,8 +251,18 @@ export class GameSession implements GameSessionHandle {
   private async enterDay(): Promise<void> {
     this.phase = "day";
     this.arm(DAY_MS, () => void this.endDay());
-    this.dayMsg = await this.deps.channel.send(
-      renderDay(null, Math.round(DAY_MS / MS_PER_MINUTE)),
+    const minutes = Math.round(DAY_MS / MS_PER_MINUTE);
+    this.dayMsg = await this.deps.channel.send(renderDay(null, minutes));
+    void this.narrateInto(
+      "day",
+      this.dayMsg,
+      () =>
+        this.deps.gameMaster.narrateDay({
+          playerNames: this.playerNames(),
+          minutes,
+        }),
+      (t) => renderDay(t, minutes),
+      NARRATION_TIMEOUT_MS,
     );
   }
 
@@ -241,9 +305,10 @@ export class GameSession implements GameSessionHandle {
       this.deaths,
       this.state!.players,
     );
+    const narration = await this.narrateReveal(outcome);
     try {
       this.revealMsg = await this.deps.channel.send(
-        renderReveal(null, this.state!, outcome, this.names),
+        renderReveal(narration, this.state!, outcome, this.names),
       );
     } catch {
       /* best effort */
@@ -251,6 +316,34 @@ export class GameSession implements GameSessionHandle {
     if (this.phase === "reveal") {
       this.phase = "done";
       this.deps.onEnd(this.channelId);
+    }
+  }
+
+  /** Capped await for the reveal narration — the payoff line, worth a short wait. */
+  private async narrateReveal(outcome: Outcome): Promise<string | null> {
+    let h: TimerHandle | undefined;
+    try {
+      const res = await Promise.race<Narration>([
+        this.deps.gameMaster.narrateReveal({
+          winningTeam: outcome.winningTeam,
+          deadNames: outcome.deaths.map((id) => this.names[id] ?? id),
+          playerNames: this.playerNames(),
+        }),
+        new Promise<Narration>((resolve) => {
+          h = this.deps.setTimer(REVEAL_NARRATION_TIMEOUT_MS, () =>
+            resolve({ ok: false }),
+          );
+        }),
+      ]);
+      return res.ok ? res.text : null;
+    } catch (err) {
+      this.deps.logger.warn("game narration failed", {
+        phase: "reveal",
+        name: err instanceof Error ? err.name : "unknown",
+      });
+      return null;
+    } finally {
+      if (h !== undefined) this.deps.clearTimer(h);
     }
   }
 

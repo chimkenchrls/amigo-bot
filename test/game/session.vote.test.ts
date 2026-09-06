@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { startedGame } from "./session-helpers.js";
 import { NIGHT_MS, VOTE_MS, DAY_MS } from "../../src/game/constants.js";
 
@@ -37,9 +37,7 @@ describe("session day + vote", () => {
     await s.skip("h"); // -> vote
     expect(s.phase).toBe("vote");
     timers.find((t) => t.ms === VOTE_MS)!.fn();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(s.phase).toBe("done");
+    await vi.waitFor(() => expect(s.phase).toBe("done"));
   });
 
   it("vote by a non-player throws; vote for a non-player target throws", async () => {

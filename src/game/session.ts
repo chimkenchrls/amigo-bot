@@ -261,6 +261,7 @@ export class GameSession implements GameSessionHandle {
     const { currentRoles, results } = resolveNight(
       state.startingRoles,
       state.nightActions,
+      (id) => this.names[id] ?? id,
     );
     state.currentRoles = currentRoles;
     this.nightResults = results;
@@ -405,6 +406,9 @@ export class GameSession implements GameSessionHandle {
     if (this.phase === "lobby" || this.state === undefined) {
       return { content: "Wala pang role — hindi pa nagsisimula." };
     }
+    if (!this.state.players.includes(id)) {
+      return { content: "Hindi ka kasali sa laro." };
+    }
     return renderRoleEphemeral(
       playerView(id, this.state, this.phase, this.nightResults),
     );
@@ -462,6 +466,23 @@ export class GameSession implements GameSessionHandle {
     if (!ACTION_KINDS[role].includes(action.kind)) {
       throw new Error("mali ang aksyon para sa role mo");
     }
+    if (action.kind === "seer-player" || action.kind === "robber") {
+      if (!state.players.includes(action.target)) {
+        throw new Error("wala sa laro ang target mo");
+      }
+    } else if (action.kind === "troublemaker") {
+      if (
+        !state.players.includes(action.a) ||
+        !state.players.includes(action.b) ||
+        action.a === action.b
+      ) {
+        throw new Error("mali ang pinili mong papalitan");
+      }
+    } else if (action.kind === "seer-center") {
+      if (!action.centers.every((c) => c === 0 || c === 1 || c === 2)) {
+        throw new Error("wala sa gitna ang pinili mo");
+      }
+    }
     state.nightActions.push(action);
     if (this.allActingPlayersActed()) await this.endNight();
   }
@@ -477,6 +498,7 @@ export class GameSession implements GameSessionHandle {
     const state = this.state;
     if (!state.players.includes(playerId)) throw new Error("wala ka sa laro");
     if (!state.players.includes(target)) throw new Error("wala sa laro ang binoto mo");
+    if (playerId === target) throw new Error("bawal iboto ang sarili mo");
     state.votes[playerId] = target;
     if (Object.keys(state.votes).length === state.players.length) {
       await this.endVote();

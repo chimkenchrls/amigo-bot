@@ -52,4 +52,53 @@ describe("session night", () => {
     const payload = s.showRole("h");
     expect(typeof payload.content).toBe("string");
   });
+
+  it("werewolf night-result lists the teammate by display NAME, not raw id", async () => {
+    // rng 0.5 deals h + b as werewolves, a as villager.
+    const { s, timers } = await startedGame({ rng: () => 0.5 });
+    timers.find((t) => t.ms === NIGHT_MS)!.fn();
+    await Promise.resolve();
+    expect(s.phase).toBe("day");
+    const content = s.showRole("h").content ?? "";
+    expect(content).toContain("Bee"); // b's display name
+    expect(content).not.toMatch(/lobo:\s*b\b/); // not the bare id "b"
+  });
+
+  it("showRole rejects a non-player", async () => {
+    const { s } = await startedGame();
+    expect(s.showRole("zzz")).toEqual({ content: "Hindi ka kasali sa laro." });
+  });
+
+  it("act() rejects an off-roster robber/seer target", async () => {
+    // rng 0.42 deals h=troublemaker, a=werewolf, b=robber.
+    const { s } = await startedGame({ rng: () => 0.42 });
+    await expect(
+      s.act("b", { kind: "robber", playerId: "b", target: "zzz" }),
+    ).rejects.toThrow(/target/);
+  });
+
+  it("act() rejects a troublemaker picking the same slot twice or an off-roster slot", async () => {
+    const { s } = await startedGame({ rng: () => 0.42 }); // h=troublemaker
+    await expect(
+      s.act("h", { kind: "troublemaker", playerId: "h", a: "a", b: "a" }),
+    ).rejects.toThrow(/papalitan/);
+    await expect(
+      s.act("h", { kind: "troublemaker", playerId: "h", a: "a", b: "zzz" }),
+    ).rejects.toThrow(/papalitan/);
+  });
+
+  it("act() rejects a seer center peek with an out-of-range index", async () => {
+    // rng 0.01 deals h=werewolf, a=seer, b=robber.
+    const { s } = await startedGame({ rng: () => 0.01 });
+    await expect(
+      s.act("a", { kind: "seer-center", playerId: "a", centers: [0, 5] }),
+    ).rejects.toThrow(/gitna/);
+  });
+
+  it("act() rejects a seer player peek at an off-roster target", async () => {
+    const { s } = await startedGame({ rng: () => 0.01 }); // a=seer
+    await expect(
+      s.act("a", { kind: "seer-player", playerId: "a", target: "zzz" }),
+    ).rejects.toThrow(/target/);
+  });
 });

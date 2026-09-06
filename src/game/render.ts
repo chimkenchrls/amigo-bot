@@ -118,10 +118,12 @@ export function renderReveal(
   }
   lines.push("**Ang mga role:**");
   for (const id of state.players) {
-    lines.push(`- ${names[id] ?? id}: ${state.startingRoles[id]} → ${state.currentRoles[id]}`);
+    lines.push(
+      `- ${names[id] ?? id}: ${state.startingRoles[id] ?? "?"} → ${state.currentRoles[id] ?? "?"}`,
+    );
   }
   lines.push(
-    `**Gitna:** ${state.startingRoles["center-0"]}, ${state.startingRoles["center-1"]}, ${state.startingRoles["center-2"]}`,
+    `**Gitna:** ${state.startingRoles["center-0"] ?? "?"}, ${state.startingRoles["center-1"] ?? "?"}, ${state.startingRoles["center-2"] ?? "?"}`,
   );
   const deaths = outcome.deaths.length
     ? outcome.deaths.map((id) => names[id] ?? id).join(", ")
@@ -192,6 +194,6 @@ export function renderActEphemeral(
   const content =
     role === "villager" || role === "tanner"
       ? "Wala kang gagawin ngayong gabi. Matulog ka na. 😴"
-      : "Nakuha mo na ang info mo kagabi — check **🔍 Role Mo**. Matulog ka na.";
+      : "Tapos ka na sa gabi. Sa **umaga** mo makikita ang mga nakita mo — pindutin ang 🔍 pagsapit ng araw.";
   return { content, flags };
 }

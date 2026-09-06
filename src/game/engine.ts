@@ -37,6 +37,7 @@ const WAKE_ORDER: RoleName[] = [
 export function resolveNight(
   startingRoles: Record<SlotId, RoleName>,
   actions: NightAction[],
+  nameOf: (id: string) => string = (id) => id,
 ): { currentRoles: Record<SlotId, RoleName>; results: NightResult[] } {
   const board: Record<SlotId, RoleName> = { ...startingRoles };
   const results = new Map<string, string[]>();
@@ -66,14 +67,14 @@ export function resolveNight(
               ? "Mag-isa kang lobo. May kapwa-lobo sa gitna."
               : "Mag-isa kang lobo ngayon gabi.");
           } else {
-            push(id, `Kasabwat mong lobo: ${others.join(", ")}.`);
+            push(id, `Kasabwat mong lobo: ${others.map(nameOf).join(", ")}.`);
           }
           break;
         }
         case "minion": {
           const wolves = playerIds.filter((o) => startingRoles[o] === "werewolf");
           push(id, wolves.length
-            ? `Ang mga lobo: ${wolves.join(", ")}. Protektahan mo sila.`
+            ? `Ang mga lobo: ${wolves.map(nameOf).join(", ")}. Protektahan mo sila.`
             : "Walang lobo sa mga manlalaro. Ikaw lang bahala.");
           break;
         }
@@ -82,14 +83,14 @@ export function resolveNight(
             (o) => o !== id && startingRoles[o] === "mason",
           );
           push(id, others.length
-            ? `Kapwa mason: ${others.join(", ")}.`
+            ? `Kapwa mason: ${others.map(nameOf).join(", ")}.`
             : "Ikaw lang ang mason. Nasa gitna ang isa pa.");
           break;
         }
         case "seer": {
           const a = actionFor(id);
           if (a?.kind === "seer-player") {
-            push(id, `Ang card ni ${a.target}: ${board[a.target]}.`);
+            push(id, `Ang card ni ${nameOf(a.target)}: ${board[a.target]}.`);
           } else if (a?.kind === "seer-center") {
             const [x, y] = a.centers;
             push(id, `Gitna #${x + 1}: ${board[`center-${x}`]}. Gitna #${y + 1}: ${board[`center-${y}`]}.`);
@@ -102,7 +103,7 @@ export function resolveNight(
             const acquired = board[a.target]!;
             board[a.target] = board[id]!;
             board[id] = acquired;
-            push(id, `Ninakaw mo ang role ni ${a.target}. Ikaw na ang: ${acquired}.`);
+            push(id, `Ninakaw mo ang role ni ${nameOf(a.target)}. Ikaw na ang: ${acquired}.`);
           }
           break;
         }

@@ -349,7 +349,25 @@ export interface FactStore {
   The distiller's output is treated as data — parsed into plain strings, clamped, and
   stored; it is never executed and only ever re-injected as background context. The
   system instruction tells the model to produce notes, not follow instructions in the
-  conversation. This matches how casual chat already handles the same content.
+  conversation. Note this is a *wider* surface than casual chat: auto-memory (like
+  `/remember`) promotes channel-authored text into the **system instruction** via
+  `withFacts`, but does so **automatically, with no command** — a user never has to run
+  `/remember` for channel text to reach the system prompt. Residual risk is still low:
+  each note is clamped to 300 chars, at most 12 auto notes are injected, notes are
+  `- `-prefixed and framed as "treat as background", and the distiller's own system
+  instruction carries an explicit anti-injection line. Auto notes are also visible and
+  removable in `/facts` (`forget:N`, `wipe:true`).
+- **Known v1 characteristic — the settle trigger and the distilled transcript disagree
+  on what "a conversation" is.** `activity.note()` counts *every* human message in a
+  channel, but the transcript handed to the distiller is `store.recent(...)`, which only
+  holds AmIgo's own triggered exchanges (`store.append` runs only after a successful
+  reply). So a channel where AmIgo is never addressed accumulates settle-trigger hits
+  from chatter the distiller never sees and is effectively never distilled; and a
+  chatty channel where AmIgo is seldom addressed would otherwise re-distil the same
+  unchanged transcript every tick. The per-channel last-message-id guard in
+  `autoMemory.run()` prevents those redundant re-distills (skips when the newest
+  `store` row id is unchanged since the last pass). Aligning the trigger with the
+  distilled content is deferred to v2.
 - Logging rules unchanged: no message text, prompts, or note content in logs.
 
 ---

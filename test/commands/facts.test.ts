@@ -87,6 +87,10 @@ describe("/facts", () => {
     await factsCommand.execute(i as never, c as never);
     expect(c.facts.replaceAuto).toHaveBeenCalledWith("channel", "c1", []);
     expect(c.facts.remove).not.toHaveBeenCalled();
+    const msg = (i.reply as ReturnType<typeof vi.fn>).mock.calls[0]![0].content;
+    expect(msg).toContain("binura ko");
+    expect(msg).toContain("mapulot ko ulit");
+    expect(msg).toContain("/forget");
   });
 
   it("wipe:true with no auto notes reports nothing to wipe", async () => {
@@ -95,6 +99,18 @@ describe("/facts", () => {
     const i = interaction({ wipe: true });
     await factsCommand.execute(i as never, c as never);
     expect(c.facts.replaceAuto).not.toHaveBeenCalled();
+    const msg = (i.reply as ReturnType<typeof vi.fn>).mock.calls[0]![0].content;
+    expect(msg).toContain("buburahin");
+    expect(msg).not.toContain("bubura-hin");
+  });
+
+  it("the listing footer points at both forget and wipe", async () => {
+    const c = ctx([fact(3, "movie night", "user"), fact(7, "auto note", "auto")]);
+    const i = interaction();
+    await factsCommand.execute(i as never, c as never);
+    const body = (i.reply as ReturnType<typeof vi.fn>).mock.calls[0]![0].content;
+    expect(body).toContain("/facts forget:<number>");
+    expect(body).toContain("/facts wipe:true");
   });
 
   it("forget wins when combined with wipe", async () => {

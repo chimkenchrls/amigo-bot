@@ -32,12 +32,16 @@ function formatTranscript(rows: MessageRow[]): string {
 
 export function createAutoMemory(deps: AutoMemoryDeps): AutoMemory {
   const inFlight = new Set<string>();
+  const lastDistilledMsgId = new Map<string, number>();
   let timer: AutoMemoryTimer | undefined;
 
   async function run(channelId: string): Promise<void> {
     try {
       const rows = deps.store.recent(channelId, DISTILL_TRANSCRIPT_TURNS);
       if (rows.length === 0) return;
+      const latestId = rows[rows.length - 1]!.id;
+      // transcript unchanged since last pass — nothing new to distil
+      if (lastDistilledMsgId.get(channelId) === latestId) return;
       const existing = deps.facts
         .list("channel", channelId)
         .filter((f) => f.source === "auto")
@@ -46,6 +50,8 @@ export function createAutoMemory(deps: AutoMemoryDeps): AutoMemory {
         existing,
         transcript: formatTranscript(rows),
       });
+      // the transcript was seen either way; don't re-distil it next tick
+      lastDistilledMsgId.set(channelId, latestId);
       if (res.ok) deps.facts.replaceAuto("channel", channelId, res.notes);
     } catch (err) {
       deps.logger.warn("auto-memory distill failed", {

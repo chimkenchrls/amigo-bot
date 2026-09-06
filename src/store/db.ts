@@ -33,7 +33,8 @@ export const MIGRATIONS: ReadonlyArray<(db: DB) => void> = [
   },
   (db) => {
     db.exec(`
-      ALTER TABLE facts ADD COLUMN source TEXT NOT NULL DEFAULT 'user';
+      ALTER TABLE facts ADD COLUMN source TEXT NOT NULL DEFAULT 'user'
+        CHECK (source IN ('user','auto'));
     `);
   },
 ];

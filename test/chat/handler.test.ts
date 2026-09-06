@@ -3,6 +3,8 @@ import { handleChat } from "../../src/chat/handler.js";
 import {
   MAX_CHAT_INPUT_CHARS,
   TYPING_KEEPALIVE_MS,
+  CHAT_COOLDOWN_MS,
+  NAME_TRIGGER_COOLDOWN_MS,
 } from "../../src/constants.js";
 import {
   RateLimitError,
@@ -59,6 +61,7 @@ function ctx(over: Partial<Parameters<ReturnType<typeof handleChat>>[0]> = {}) {
     displayName: "Dana",
     text: "hello",
     guildId: "g",
+    directPing: true,
     sendTyping: vi.fn(async () => {}),
     reply: vi.fn(async () => ({ id: "r1", edit })),
     followUp: vi.fn(async () => ({ id: "r2", edit: vi.fn(async () => {}) })),
@@ -71,14 +74,25 @@ function ctx(over: Partial<Parameters<ReturnType<typeof handleChat>>[0]> = {}) {
 describe("handleChat", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("reacts and does nothing else when on cooldown", async () => {
+  it("reacts and does nothing else when a direct ping is on cooldown", async () => {
     const d = deps();
     d.cooldown.check = vi.fn(() => ({ ok: false, retryAfter: 3 }));
     const c = ctx();
     await handleChat(d)(c);
     expect(c.react).toHaveBeenCalledWith("🥱");
+    expect(d.cooldown.check).toHaveBeenCalledWith("u", "chat", CHAT_COOLDOWN_MS);
     expect(generateReplyStream).not.toHaveBeenCalled();
     expect(c.reply).not.toHaveBeenCalled();
+  });
+
+  it("uses the longer name-trigger cooldown and stays silent (no 🥱) when it's a name-only hit", async () => {
+    const d = deps();
+    d.cooldown.check = vi.fn(() => ({ ok: false, retryAfter: 20 }));
+    const c = ctx({ directPing: false });
+    await handleChat(d)(c);
+    expect(d.cooldown.check).toHaveBeenCalledWith("u", "chat-name", NAME_TRIGGER_COOLDOWN_MS);
+    expect(c.react).not.toHaveBeenCalled();
+    expect(generateReplyStream).not.toHaveBeenCalled();
   });
 
   it("posts the first delta, edits to the full text, and persists both turns", async () => {

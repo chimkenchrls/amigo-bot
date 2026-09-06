@@ -74,6 +74,7 @@ export function onMessageCreate(
       displayName,
       text: outcome.text,
       guildId: message.guildId,
+      directPing: mentionsBot || replyToBot,
       sendTyping: () => channel.sendTyping(),
       reply: async (content) => {
         try {

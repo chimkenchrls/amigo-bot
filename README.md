@@ -41,7 +41,7 @@ its messages) for group-chat banter with per-channel memory.
 - **Chat** — the bot replies when you `@mention` it, reply to one of its messages,
   or just say **"amigo"** in your message (whole word, any case). The reply is
   streamed: it posts as soon as the first words land and edits itself in place as
-  the rest arrives. 5s per-user cooldown.
+  the rest arrives. 5s per-user cooldown for a direct ping, 30s for a bare "amigo".
 - **`/forget`** — wipes my stored memory of the channel's conversation. Fresh start.
 - **`/study`** — toggles study mode for the channel. While on, `@mention` chat uses a
   focused-tutor persona instead of the group-chat one: it explains a concept with a

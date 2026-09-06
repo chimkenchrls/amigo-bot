@@ -9,11 +9,19 @@ describe("session night", () => {
     await expect(s.act("zzz", { kind: "noop", playerId: "zzz" })).rejects.toThrow();
   });
 
-  it("rejects act() whose payload playerId is not the caller", async () => {
-    const { s, timers } = await startedGame();
-    // "a" tries to submit an action attributed to "b" — rejected outright
-    await expect(s.act("a", { kind: "noop", playerId: "b" })).rejects.toThrow();
-    // the spoof recorded nothing, so the night still runs its full course
+  it("rejects a spoofed act() on the mismatch guard, recording nothing for the target", async () => {
+    // rng 0.01 deals h=werewolf, a=seer, b=robber. "noop" is not a seer kind,
+    // so before the guard was reordered this rejected on ACTION_KINDS ("mali ang
+    // aksyon"); now the playerId-mismatch guard runs first ("hindi tugma").
+    const { s, timers } = await startedGame({ rng: () => 0.01 });
+    await expect(
+      s.act("a", { kind: "noop", playerId: "b" }),
+    ).rejects.toThrow(/tugma/);
+    // nothing was recorded for "b": "b" is still free to submit their own action
+    await expect(
+      s.act("b", { kind: "robber", playerId: "b", target: "a" }),
+    ).resolves.toBeUndefined();
+    // and the night still runs its full course
     expect(s.phase).toBe("night");
     timers.find((t) => t.ms === NIGHT_MS)!.fn();
     await Promise.resolve();

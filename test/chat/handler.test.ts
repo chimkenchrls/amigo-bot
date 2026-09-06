@@ -49,6 +49,13 @@ function deps(over: Partial<Parameters<typeof handleChat>[0]> = {}) {
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     model: "m",
     studyMode: { has: vi.fn(() => false), toggle: vi.fn(() => true), off: vi.fn() },
+    facts: {
+      forChat: vi.fn(() => ({ channel: [], guild: [] })),
+      add: vi.fn(),
+      list: vi.fn(() => []),
+      remove: vi.fn(),
+      count: vi.fn(() => 0),
+    },
     ...over,
   };
 }
@@ -228,6 +235,22 @@ describe("handleChat", () => {
     const c = ctx();
     await handleChat(d)(c);
     expect((generateReplyStream as any).mock.calls[0][1].studyMode).toBe(false);
+  });
+
+  it("loads the channel's saved facts and passes them to the stream", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
+    const d = deps();
+    (d.facts.forChat as any).mockReturnValue({
+      channel: [{ content: "Eli hates cilantro" }],
+      guild: [{ content: "timezone is PHT" }],
+    });
+    const c = ctx();
+    await handleChat(d)(c);
+    expect(d.facts.forChat).toHaveBeenCalledWith("c", "g");
+    expect((generateReplyStream as any).mock.calls[0][1].facts).toEqual({
+      channel: ["Eli hates cilantro"],
+      guild: ["timezone is PHT"],
+    });
   });
 
   it("clamps oversized inbound text before the AI call and before persisting", async () => {

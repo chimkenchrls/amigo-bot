@@ -21,6 +21,12 @@ describe("openDatabase", () => {
     expect(cols.map((c) => c.name).sort()).toEqual(
       ["channel_id", "content", "created_at", "id", "role"].sort(),
     );
+    const factCols = db.prepare("PRAGMA table_info(facts)").all() as {
+      name: string;
+    }[];
+    expect(factCols.map((c) => c.name).sort()).toEqual(
+      ["content", "created_at", "created_by", "id", "scope", "scope_id"].sort(),
+    );
   });
 
   it("is idempotent when reopened on the same connection", () => {

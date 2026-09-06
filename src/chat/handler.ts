@@ -14,6 +14,7 @@ import type { MessageStore } from "../store/messages.js";
 import type { Logger } from "../lib/log.js";
 import type { BotMessageCache } from "../lib/botMessages.js";
 import type { StudyMode } from "../lib/studyMode.js";
+import type { FactStore } from "../store/facts.js";
 import { chunk } from "../lib/chunk.js";
 import { toGeminiHistory, generateReplyStream } from "../ai/conversation.js";
 import {
@@ -30,6 +31,7 @@ export interface ChatDeps {
   logger: Logger;
   model: string;
   studyMode: StudyMode;
+  facts: FactStore;
 }
 
 export interface SentMessage {
@@ -98,11 +100,16 @@ export function handleChat(deps: ChatDeps) {
       let interrupted: unknown;
 
       try {
+        const savedFacts = deps.facts.forChat(ctx.channelId, ctx.guildId);
         for await (const delta of generateReplyStream(deps.genai, {
           history,
           userTurn,
           model: deps.model,
           studyMode: deps.studyMode.has(ctx.channelId),
+          facts: {
+            channel: savedFacts.channel.map((f) => f.content),
+            guild: savedFacts.guild.map((f) => f.content),
+          },
         })) {
           acc += delta;
           const preview = acc.trim().slice(0, DISCORD_MSG_LIMIT);

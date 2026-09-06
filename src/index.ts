@@ -7,6 +7,7 @@ import { createCooldown } from "./lib/cooldown.js";
 import { createBotMessageCache } from "./lib/botMessages.js";
 import { openDatabase } from "./store/db.js";
 import { createMessageStore } from "./store/messages.js";
+import { createFactStore } from "./store/facts.js";
 import { createGenAI } from "./ai/client.js";
 import { createClient } from "./client.js";
 import { createRegistry } from "./game/registry.js";
@@ -23,6 +24,7 @@ if (config.databasePath !== ":memory:") {
 }
 const db = openDatabase(config.databasePath);
 const store = createMessageStore(db);
+const facts = createFactStore(db);
 const cooldown = createCooldown();
 const botMessages = createBotMessageCache();
 const genai = createGenAI(config.geminiApiKey);
@@ -32,7 +34,7 @@ const studyMode = createStudyMode();
 const client = createClient();
 registerReady(client, logger);
 
-const commandCtx = { cooldown, genai, logger, model: config.model, registry, studyMode, store };
+const commandCtx = { cooldown, genai, logger, model: config.model, registry, studyMode, store, facts };
 client.on(
   "interactionCreate",
   routeInteraction({ commands, ctx: commandCtx, logger, registry }),
@@ -49,6 +51,7 @@ client.on(
     getBotUserId: () => botUserId.current,
     registry,
     studyMode,
+    facts,
   }),
 );
 

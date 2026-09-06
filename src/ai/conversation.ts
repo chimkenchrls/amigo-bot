@@ -31,6 +31,19 @@ export interface ReplyParams {
   model: string;
   /** When true, AmIgo replies as a focused tutor instead of the group-chat persona. */
   studyMode?: boolean;
+  /** Curated long-term notes to fold into the system prompt. */
+  facts?: { channel: string[]; guild: string[] };
+}
+
+function withFacts(
+  persona: string,
+  facts: ReplyParams["facts"],
+): string {
+  const lines: string[] = [];
+  for (const f of facts?.guild ?? []) lines.push(`- (server) ${f}`);
+  for (const f of facts?.channel ?? []) lines.push(`- ${f}`);
+  if (lines.length === 0) return persona;
+  return `${persona}\n\nLong-term notes you've saved (treat as background, don't recite them):\n${lines.join("\n")}`;
 }
 
 export type ChatResult =
@@ -44,7 +57,10 @@ function newChat(genai: GoogleGenAI, params: ReplyParams) {
     model: params.model,
     history: params.history,
     config: {
-      systemInstruction: params.studyMode ? STUDY_PERSONA : CHAT_PERSONA,
+      systemInstruction: withFacts(
+        params.studyMode ? STUDY_PERSONA : CHAT_PERSONA,
+        params.facts,
+      ),
       safetySettings: SAFETY_SETTINGS,
       temperature: 0.9,
       thinkingConfig: { thinkingLevel: CHAT_THINKING_LEVEL },

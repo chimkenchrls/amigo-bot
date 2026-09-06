@@ -1,13 +1,29 @@
 import type { GameSessionHandle } from "./registry.js";
 import type { MessagePayload } from "./render.js";
-import { renderLobby, renderNight, renderRoleEphemeral } from "./render.js";
+import { renderDay, renderLobby, renderNight, renderRoleEphemeral } from "./render.js";
 import type { GameMaster } from "../ai/gameMaster.js";
 import type { Logger } from "../lib/log.js";
-import type { GameState, NightAction, NightResult, Phase } from "./types.js";
+import type { GameState, NightAction, NightResult, Phase, RoleName } from "./types.js";
 import type { Lobby } from "./lobby.js";
 import { addPlayer, canStart, emptyLobby, removePlayer } from "./lobby.js";
-import { deal, pickRoleSet, playerView } from "./engine.js";
-import { LOBBY_TIMEOUT_MS, NIGHT_MS } from "./constants.js";
+import { deal, pickRoleSet, playerView, resolveNight } from "./engine.js";
+import { ROLES } from "./roles.js";
+import { DAY_MS, LOBBY_TIMEOUT_MS, NIGHT_MS } from "./constants.js";
+
+const MS_PER_MINUTE = 60_000;
+
+/** The `NightAction.kind`s a given starting role is allowed to submit. */
+const ACTION_KINDS: Record<RoleName, ReadonlyArray<NightAction["kind"]>> = {
+  seer: ["seer-player", "seer-center"],
+  robber: ["robber"],
+  troublemaker: ["troublemaker"],
+  werewolf: ["noop"],
+  minion: ["noop"],
+  mason: ["noop"],
+  insomniac: ["noop"],
+  villager: ["noop"],
+  tanner: ["noop"],
+};
 
 /** A posted message the session can later edit in place. */
 export interface SentMessage {
@@ -53,6 +69,7 @@ export class GameSession implements GameSessionHandle {
   private nightResults: NightResult[] = [];
   private lobbyMsg!: SentMessage;
   private nightMsg: SentMessage | undefined;
+  private dayMsg: SentMessage | undefined;
   private activeTimer: TimerHandle | undefined;
 
   constructor(hostId: string, deps: SessionDeps) {
@@ -125,12 +142,51 @@ export class GameSession implements GameSessionHandle {
 
   private async enterNight(): Promise<void> {
     this.phase = "night";
+    this.state!.nightActions = [];
     this.arm(NIGHT_MS, () => void this.endNight());
     this.nightMsg = await this.deps.channel.send(renderNight(null));
   }
 
-  private endNight(): void {
-    // filled in Task 11
+  /** True once every player whose starting role acts has an action recorded. */
+  private allActingPlayersActed(): boolean {
+    const state = this.state!;
+    return state.players.every(
+      (id) =>
+        !ROLES[state.startingRoles[id]!].acts ||
+        state.nightActions.some((a) => a.playerId === id),
+    );
+  }
+
+  /**
+   * Resolve the night once (idempotent — the timer and the last `act` can race),
+   * freeze the results, then move to day.
+   */
+  private async endNight(): Promise<void> {
+    if (this.phase !== "night") return;
+    if (this.activeTimer !== undefined) {
+      this.deps.clearTimer(this.activeTimer);
+      this.activeTimer = undefined;
+    }
+    const state = this.state!;
+    const { currentRoles, results } = resolveNight(
+      state.startingRoles,
+      state.nightActions,
+    );
+    state.currentRoles = currentRoles;
+    this.nightResults = results;
+    await this.enterDay();
+  }
+
+  private async enterDay(): Promise<void> {
+    this.phase = "day";
+    this.arm(DAY_MS, () => void this.endDay());
+    this.dayMsg = await this.deps.channel.send(
+      renderDay(null, Math.round(DAY_MS / MS_PER_MINUTE)),
+    );
+  }
+
+  private async endDay(): Promise<void> {
+    // filled in Task 12
   }
 
   async abort(reason: string): Promise<void> {
@@ -161,8 +217,23 @@ export class GameSession implements GameSessionHandle {
     throw new Error("hindi pwede 'yan ngayon");
   }
 
-  async act(_playerId: string, _action: NightAction): Promise<void> {
-    throw new Error("hindi pwede 'yan ngayon");
+  async act(playerId: string, action: NightAction): Promise<void> {
+    if (this.phase !== "night" || this.state === undefined) {
+      throw new Error("hindi pwede 'yan ngayon");
+    }
+    const state = this.state;
+    if (!state.players.includes(playerId)) {
+      throw new Error("wala ka sa laro");
+    }
+    if (state.nightActions.some((a) => a.playerId === playerId)) {
+      throw new Error("umaksyon ka na kagabi");
+    }
+    const role = state.startingRoles[playerId]!;
+    if (!ACTION_KINDS[role].includes(action.kind)) {
+      throw new Error("mali ang aksyon para sa role mo");
+    }
+    state.nightActions.push(action);
+    if (this.allActingPlayersActed()) await this.endNight();
   }
 
   async vote(_playerId: string, _target: string): Promise<void> {

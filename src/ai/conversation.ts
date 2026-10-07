@@ -33,6 +33,17 @@ export interface ReplyParams {
   studyMode?: boolean;
   /** Curated long-term notes to fold into the system prompt. */
   facts?: { channel: string[]; guild: string[] };
+  /** An image attached to this turn — base64 data + its MIME type. */
+  image?: { data: string; mimeType: string };
+}
+
+/** The user turn as sent to Gemini: a bare string, or an image part + text. */
+function buildMessage(params: ReplyParams) {
+  if (!params.image) return params.userTurn;
+  return [
+    { inlineData: { mimeType: params.image.mimeType, data: params.image.data } },
+    { text: params.userTurn },
+  ];
 }
 
 function withFacts(
@@ -78,7 +89,7 @@ export async function generateReply(
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await newChat(genai, params).sendMessage({
-        message: params.userTurn,
+        message: buildMessage(params),
       });
       const text = (res.text ?? "").trim();
       return text ? { ok: true, text } : { ok: false, reason: "blocked" };
@@ -114,7 +125,7 @@ export async function* generateReplyStream(
     let yielded = false;
     try {
       const stream = await newChat(genai, params).sendMessageStream({
-        message: params.userTurn,
+        message: buildMessage(params),
       });
       for await (const chunk of stream) {
         const text = chunk.text ?? "";

@@ -34,6 +34,16 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...full, LOG_LEVEL: "loud" }).logLevel).toBe("info");
   });
 
+  it("leaves ownerId undefined when OWNER_ID is unset", () => {
+    expect(loadConfig({ ...full }).ownerId).toBeUndefined();
+  });
+
+  it("trims OWNER_ID", () => {
+    expect(loadConfig({ ...full, OWNER_ID: "  1234567890  " }).ownerId).toBe(
+      "1234567890",
+    );
+  });
+
   it("throws listing every missing required var", () => {
     expect(() => loadConfig({})).toThrow(/DISCORD_TOKEN/);
     expect(() => loadConfig({})).toThrow(/DISCORD_APP_ID/);

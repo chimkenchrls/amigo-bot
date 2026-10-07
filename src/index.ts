@@ -68,6 +68,7 @@ client.on(
     studyMode,
     facts,
     autoMemory,
+    ownerId: config.ownerId,
   }),
 );
 autoMemory.start();

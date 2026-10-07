@@ -8,6 +8,22 @@ vi.mock("../../src/chat/handler.js", async (orig) => {
 });
 import { handleChat } from "../../src/chat/handler.js";
 
+vi.mock("../../src/lib/image.js", async (orig) => {
+  const actual = (await orig()) as object;
+  return {
+    ...actual,
+    fetchImageAsBase64: vi.fn(async () => ({ data: "B64", mimeType: "image/png" })),
+  };
+});
+import { fetchImageAsBase64 } from "../../src/lib/image.js";
+
+const imageAttachment = (over: Record<string, unknown> = {}) => ({
+  contentType: "image/png",
+  size: 1000,
+  url: "https://cdn/pic.png",
+  ...over,
+});
+
 function baseDeps() {
   return {
     cooldown: { check: vi.fn(() => ({ ok: true, retryAfter: 0 })) },
@@ -197,6 +213,107 @@ describe("onMessageCreate", () => {
     const m = msg({ author: { bot: true, id: "u1" } });
     await onMessageCreate(deps as never)(m as never);
     expect(deps.autoMemory.note).not.toHaveBeenCalled();
+  });
+
+  it("fetches the first valid image attachment and passes it on the ctx", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    (fetchImageAsBase64 as any).mockResolvedValueOnce({
+      data: "B64",
+      mimeType: "image/png",
+    });
+    const m = msg({
+      mentions: { users: new Map([["BOT", {}]]) },
+      attachments: new Map([["a1", imageAttachment()]]),
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(fetchImageAsBase64).toHaveBeenCalledWith("https://cdn/pic.png", "image/png");
+    expect(inner.mock.calls[0]![0].image).toEqual({ data: "B64", mimeType: "image/png" });
+  });
+
+  it("ignores a non-image attachment and still replies text-only", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const m = msg({
+      mentions: { users: new Map([["BOT", {}]]) },
+      attachments: new Map([
+        ["a1", imageAttachment({ contentType: "application/pdf" })],
+      ]),
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(fetchImageAsBase64).not.toHaveBeenCalled();
+    expect(inner).toHaveBeenCalledOnce();
+    expect(inner.mock.calls[0]![0].image).toBeUndefined();
+  });
+
+  it("ignores an oversized image attachment", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const m = msg({
+      mentions: { users: new Map([["BOT", {}]]) },
+      attachments: new Map([
+        ["a1", imageAttachment({ size: 99 * 1024 * 1024 })],
+      ]),
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(fetchImageAsBase64).not.toHaveBeenCalled();
+    expect(inner.mock.calls[0]![0].image).toBeUndefined();
+  });
+
+  it("falls back to text-only and warns when the image fetch fails", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    (fetchImageAsBase64 as any).mockRejectedValueOnce(new Error("boom"));
+    const deps = baseDeps();
+    const m = msg({
+      mentions: { users: new Map([["BOT", {}]]) },
+      attachments: new Map([["a1", imageAttachment()]]),
+    });
+    await onMessageCreate(deps)(m as never);
+    expect(inner).toHaveBeenCalledOnce();
+    expect(inner.mock.calls[0]![0].image).toBeUndefined();
+    expect(deps.logger.warn).toHaveBeenCalled();
+  });
+
+  it("uses only the first valid image when several are attached", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const m = msg({
+      mentions: { users: new Map([["BOT", {}]]) },
+      attachments: new Map([
+        ["a1", imageAttachment({ url: "https://cdn/first.png" })],
+        ["a2", imageAttachment({ url: "https://cdn/second.png" })],
+      ]),
+    });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(fetchImageAsBase64).toHaveBeenCalledTimes(1);
+    expect(fetchImageAsBase64).toHaveBeenCalledWith("https://cdn/first.png", "image/png");
+  });
+
+  it("marks ctx.isOwner true when the author id matches the configured ownerId", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const deps = { ...baseDeps(), ownerId: "u1" };
+    const m = msg({ mentions: { users: new Map([["BOT", {}]]) } });
+    await onMessageCreate(deps)(m as never);
+    expect(inner.mock.calls[0]![0].isOwner).toBe(true);
+  });
+
+  it("marks ctx.isOwner false for a non-owner author", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const deps = { ...baseDeps(), ownerId: "someone-else" };
+    const m = msg({ mentions: { users: new Map([["BOT", {}]]) } });
+    await onMessageCreate(deps)(m as never);
+    expect(inner.mock.calls[0]![0].isOwner).toBe(false);
+  });
+
+  it("marks ctx.isOwner false when no ownerId is configured", async () => {
+    const inner = vi.fn(async (_ctx: ChatContext) => {});
+    (handleChat as any).mockReturnValue(inner);
+    const m = msg({ mentions: { users: new Map([["BOT", {}]]) } });
+    await onMessageCreate(baseDeps())(m as never);
+    expect(inner.mock.calls[0]![0].isOwner).toBe(false);
   });
 
   it("invokes the chat handler normally when no game is active", async () => {

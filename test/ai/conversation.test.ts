@@ -103,6 +103,44 @@ describe("generateReply", () => {
     expect(sys).not.toContain("Long-term notes");
   });
 
+  it("tells the group-chat persona to reply as one short block, no blank lines", async () => {
+    const { genai, create } = fakeGenAI(() => ({ text: "ok" }));
+    await generateReply(genai, { history: [], userTurn: "x", model: "m" });
+    const sys = (
+      (create.mock.calls[0] as unknown[])[0] as {
+        config: { systemInstruction: string };
+      }
+    ).config.systemInstruction;
+    expect(sys).toMatch(/no blank lines/i);
+  });
+
+  it("does not put the no-blank-lines rule in the study persona", async () => {
+    const { genai, create } = fakeGenAI(() => ({ text: "ok" }));
+    await generateReply(genai, {
+      history: [],
+      userTurn: "x",
+      model: "m",
+      studyMode: true,
+    });
+    const sys = (
+      (create.mock.calls[0] as unknown[])[0] as {
+        config: { systemInstruction: string };
+      }
+    ).config.systemInstruction;
+    expect(sys).not.toMatch(/no blank lines/i);
+  });
+
+  it("instructs the bot that only a [boss]-tagged speaker can command it", async () => {
+    const { genai, create } = fakeGenAI(() => ({ text: "ok" }));
+    await generateReply(genai, { history: [], userTurn: "x", model: "m" });
+    const sys = (
+      (create.mock.calls[0] as unknown[])[0] as {
+        config: { systemInstruction: string };
+      }
+    ).config.systemInstruction;
+    expect(sys).toContain("[boss]");
+  });
+
   it("uses the study-buddy persona when studyMode is set", async () => {
     const { genai, create } = fakeGenAI(() => ({ text: "sure" }));
     await generateReply(genai, {
@@ -123,6 +161,30 @@ describe("generateReply", () => {
     expect(
       await generateReply(genai, { history: [], userTurn: "x", model: "m" }),
     ).toEqual({ ok: false, reason: "blocked" });
+  });
+
+  it("sends an inlineData image part alongside the text when an image is given", async () => {
+    const { genai, sendMessage } = fakeGenAI(() => ({ text: "nice pic" }));
+    await generateReply(genai, {
+      history: [],
+      userTurn: "Dana: ano to",
+      model: "m",
+      image: { data: "B64", mimeType: "image/png" },
+    });
+    expect((sendMessage.mock.calls[0] as unknown[])[0]).toEqual({
+      message: [
+        { inlineData: { mimeType: "image/png", data: "B64" } },
+        { text: "Dana: ano to" },
+      ],
+    });
+  });
+
+  it("sends a plain string message when no image is given", async () => {
+    const { genai, sendMessage } = fakeGenAI(() => ({ text: "ok" }));
+    await generateReply(genai, { history: [], userTurn: "Dana: hi", model: "m" });
+    expect((sendMessage.mock.calls[0] as unknown[])[0]).toEqual({
+      message: "Dana: hi",
+    });
   });
 
   it("throws RateLimitError on 429", async () => {
@@ -213,6 +275,24 @@ describe("generateReplyStream", () => {
     expect(
       await drain(generateReplyStream(genai, { history: [], userTurn: "x", model: "m" })),
     ).toEqual(["a", "b"]);
+  });
+
+  it("sends an inlineData image part alongside the text when an image is given", async () => {
+    const { genai, sendMessageStream } = fakeStreamGenAI(() => chunks(["yo"]));
+    await drain(
+      generateReplyStream(genai, {
+        history: [],
+        userTurn: "Dana: check this",
+        model: "m",
+        image: { data: "IMG", mimeType: "image/jpeg" },
+      }),
+    );
+    expect((sendMessageStream.mock.calls[0] as unknown[])[0]).toEqual({
+      message: [
+        { inlineData: { mimeType: "image/jpeg", data: "IMG" } },
+        { text: "Dana: check this" },
+      ],
+    });
   });
 
   it("throws RateLimitError on a pre-stream 429 without retrying", async () => {

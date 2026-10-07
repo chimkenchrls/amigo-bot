@@ -7,6 +7,8 @@ export interface Config {
   model: string;
   databasePath: string;
   logLevel: LogLevel;
+  /** Discord user id of the one person the bot takes orders from. Unset = nobody. */
+  ownerId?: string | undefined;
 }
 
 const LOG_LEVELS: readonly LogLevel[] = ["debug", "info", "warn", "error"];
@@ -35,6 +37,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     model: env.GEMINI_MODEL?.trim() || "gemini-3.6-flash",
     databasePath: env.DATABASE_PATH?.trim() || "./data/amigo.db",
     logLevel,
+    ownerId: env.OWNER_ID?.trim() || undefined,
   };
 }
 

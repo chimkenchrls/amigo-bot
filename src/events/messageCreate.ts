@@ -2,6 +2,8 @@ import type { Message } from "discord.js";
 import { DISCORD_UNKNOWN_MESSAGE } from "../constants.js";
 import { evaluateTrigger, mentionsName } from "../chat/trigger.js";
 import { handleChat, type ChatContext, type ChatDeps } from "../chat/handler.js";
+import { validateImage, fetchImageAsBase64 } from "../lib/image.js";
+import type { Logger } from "../lib/log.js";
 import type { BotMessageCache } from "../lib/botMessages.js";
 import type { GameRegistry } from "../game/registry.js";
 import type { AutoMemory } from "../memory/autoMemory.js";
@@ -11,6 +13,8 @@ export type MessageDeps = ChatDeps & {
   getBotUserId: () => string;
   registry: GameRegistry;
   autoMemory: AutoMemory;
+  /** Discord user id the bot takes orders from; undefined = nobody is the owner. */
+  ownerId?: string | undefined;
 };
 
 export async function isReplyToBot(
@@ -27,6 +31,34 @@ export async function isReplyToBot(
   } catch {
     return false;
   }
+}
+
+/**
+ * The first image attachment we can use, fetched as base64 — or undefined if
+ * there is none, it fails validation, or the download fails (chat falls back to
+ * a text-only reply either way).
+ */
+async function firstImage(
+  message: Message,
+  logger: Logger,
+): Promise<{ data: string; mimeType: string } | undefined> {
+  for (const att of message.attachments?.values() ?? []) {
+    const check = validateImage({
+      contentType: att.contentType,
+      size: att.size,
+      url: att.url,
+    });
+    if (!check.ok) continue;
+    try {
+      return await fetchImageAsBase64(att.url, check.mimeType);
+    } catch (err) {
+      logger.warn("chat image fetch failed", {
+        name: err instanceof Error ? err.name : "unknown",
+      });
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 export function onMessageCreate(
@@ -74,6 +106,7 @@ export function onMessageCreate(
     if (!("sendTyping" in channel)) return;
 
     const displayName = message.member?.displayName ?? message.author.username;
+    const image = await firstImage(message, deps.logger);
 
     const ctx: ChatContext = {
       channelId: message.channelId,
@@ -82,6 +115,8 @@ export function onMessageCreate(
       text: outcome.text,
       guildId: message.guildId,
       directPing: mentionsBot || replyToBot,
+      isOwner: !!deps.ownerId && message.author.id === deps.ownerId,
+      ...(image ? { image } : {}),
       sendTyping: () => channel.sendTyping(),
       reply: async (content) => {
         try {

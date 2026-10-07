@@ -275,6 +275,95 @@ describe("handleChat", () => {
     );
   });
 
+  it("forwards ctx.image to the stream and marks the persisted turn", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
+    const d = deps();
+    const c = ctx({ image: { data: "B64", mimeType: "image/png" } });
+    await handleChat(d)(c);
+    const params = (generateReplyStream as any).mock.calls[0][1];
+    expect(params.image).toEqual({ data: "B64", mimeType: "image/png" });
+    expect(params.userTurn).toBe("Dana: [nagpadala ng litrato] hello");
+    expect(d.store.append).toHaveBeenNthCalledWith(
+      1,
+      "c",
+      "user",
+      "Dana: [nagpadala ng litrato] hello",
+    );
+  });
+
+  it("marks an image-only turn (no caption) without a trailing space", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
+    const d = deps();
+    const c = ctx({ text: "", image: { data: "B64", mimeType: "image/png" } });
+    await handleChat(d)(c);
+    expect((generateReplyStream as any).mock.calls[0][1].userTurn).toBe(
+      "Dana: [nagpadala ng litrato]",
+    );
+  });
+
+  it("does not mark the turn or pass an image when ctx.image is absent", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
+    const d = deps();
+    const c = ctx();
+    await handleChat(d)(c);
+    const params = (generateReplyStream as any).mock.calls[0][1];
+    expect(params.image).toBeUndefined();
+    expect(params.userTurn).toBe("Dana: hello");
+  });
+
+  it("labels the owner's turn with [boss] in the AI call and the persisted history", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["yo"]));
+    const d = deps();
+    await handleChat(d)(ctx({ isOwner: true }));
+    expect((generateReplyStream as any).mock.calls[0][1].userTurn).toBe(
+      "Dana [boss]: hello",
+    );
+    expect(d.store.append).toHaveBeenNthCalledWith(
+      1,
+      "c",
+      "user",
+      "Dana [boss]: hello",
+    );
+  });
+
+  it("keeps a plain name label when the speaker is not the owner", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["yo"]));
+    const d = deps();
+    await handleChat(d)(ctx({ isOwner: false }));
+    expect((generateReplyStream as any).mock.calls[0][1].userTurn).toBe(
+      "Dana: hello",
+    );
+  });
+
+  it("collapses blank lines in a non-study reply before sending and persisting", async () => {
+    (generateReplyStream as any).mockReturnValue(
+      streamOf(["sagot una\n\nsagot dalawa"]),
+    );
+    const d = deps();
+    const c = ctx();
+    await handleChat(d)(c);
+    expect(c.edit).toHaveBeenLastCalledWith("sagot una\nsagot dalawa");
+    expect(d.store.append).toHaveBeenNthCalledWith(
+      2,
+      "c",
+      "model",
+      "sagot una\nsagot dalawa",
+    );
+  });
+
+  it("keeps blank lines when the channel is in study mode", async () => {
+    (generateReplyStream as any).mockReturnValue(streamOf(["para 1\n\npara 2"]));
+    const d = deps();
+    d.studyMode.has = vi.fn(() => true);
+    await handleChat(d)(ctx());
+    expect(d.store.append).toHaveBeenNthCalledWith(
+      2,
+      "c",
+      "model",
+      "para 1\n\npara 2",
+    );
+  });
+
   it("clamps oversized inbound text before the AI call and before persisting", async () => {
     (generateReplyStream as any).mockReturnValue(streamOf(["sup"]));
     const d = deps();

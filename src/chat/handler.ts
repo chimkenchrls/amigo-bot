@@ -48,6 +48,10 @@ export interface ChatContext {
   guildId: string | null;
   /** True for an @mention or a reply-to-bot; false when only the name "amigo" triggered it. */
   directPing: boolean;
+  /** True when the speaker is the configured bot owner — their turn is tagged "[boss]". */
+  isOwner?: boolean;
+  /** An image attached to the triggering message — base64 data + its MIME type. */
+  image?: { data: string; mimeType: string };
   sendTyping(): Promise<void>;
   reply(content: string): Promise<SentMessage>;
   followUp(content: string): Promise<SentMessage>;
@@ -90,10 +94,26 @@ export function handleChat(deps: ChatDeps) {
         ctx.sendTyping().catch(() => {});
       }, TYPING_KEEPALIVE_MS);
 
+      const inStudyMode = deps.studyMode.has(ctx.channelId);
+      // Gemini likes to format group-chat replies as multiple paragraphs; the
+      // GC persona wants one tight block. Study mode keeps its paragraphs.
+      const tidy = (s: string) =>
+        inStudyMode ? s : s.replace(/\n[ \t]*\n+/g, "\n");
+
       const rows = deps.store.recent(ctx.channelId, CHAT_HISTORY_LOAD);
       const history = toGeminiHistory(rows);
       const clampedText = ctx.text.slice(0, MAX_CHAT_INPUT_CHARS);
-      const userTurn = `${ctx.displayName}: ${clampedText}`;
+      // History is text-only, so an attached image leaves a marker in the turn
+      // that later turns can still read sensibly.
+      const body = ctx.image
+        ? `[nagpadala ng litrato] ${clampedText}`.trimEnd()
+        : clampedText;
+      // The owner's turn carries a "[boss]" tag so the persona knows whose
+      // instructions to obey — the tag rides in the persisted history too.
+      const label = ctx.isOwner
+        ? `${ctx.displayName} [boss]`
+        : ctx.displayName;
+      const userTurn = `${label}: ${body}`;
 
       let acc = "";
       let handle: SentMessage | undefined;
@@ -115,14 +135,15 @@ export function handleChat(deps: ChatDeps) {
           history,
           userTurn,
           model: deps.model,
-          studyMode: deps.studyMode.has(ctx.channelId),
+          ...(ctx.image ? { image: ctx.image } : {}),
+          studyMode: inStudyMode,
           facts: {
             channel: channelNotes,
             guild: savedFacts.guild.map((f) => f.content),
           },
         })) {
           acc += delta;
-          const preview = acc.trim().slice(0, DISCORD_MSG_LIMIT);
+          const preview = tidy(acc.trim()).slice(0, DISCORD_MSG_LIMIT);
           if (!preview) continue;
           const now = Date.now();
           if (handle === undefined) {
@@ -162,7 +183,7 @@ export function handleChat(deps: ChatDeps) {
       }
 
       stopTyping();
-      const finalText = acc.trim();
+      const finalText = tidy(acc.trim());
 
       if (!finalText) {
         await sendChunks(ctx, deps, ERR_BLOCKED);
